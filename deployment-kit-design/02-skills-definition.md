@@ -162,57 +162,180 @@
 
 ### 2. generate-xac（XaC生成）
 
+#### 使用场景
+**典型用户故事**：用户从未写过 XaC 代码，但现网有 HIS 资源，希望通过这个 skill 快速将现网资源转换为 XaC 代码，通过验证后可以执行部署。
+
+**核心价值**：实现从"手动管理"到"代码化管理"的关键转换
+
 #### 触发条件
 - **用户意图**：
   - "生成XaC代码"
-  - "从资源创建XaC"
-  - "转换为XaC格式"
-- **工作流调用**：资源发现后的下一步
-- **前置技能依赖**：discover-resources完成
+  - "从现网资源创建XaC"
+  - "将现网资源代码化"
+- **工作流调用**：discover-resources 之后的下一步
+- **前置技能依赖**：discover-resources 已完成
 
 #### 前置检查
 - **环境检查**：
-  - XaC工具环境可用
-  - Terraform CLI正常
-  - YAML解析器可用
+  - XaC 代码生成工具可用
+  - YAML 解析器可用
+  - 目标目录可写
 - **输入验证**：
-  - 资源清单文件存在
-  - 清单数据格式正确
-  - 目标路径可写
+  - 项目缓存存在：`.deployment-kit/cache/{appid}/resources.json`
+  - 或者支持 `--fresh` 模式重新调用 discover-resources
+  - 资源数据格式正确
 - **依赖检查**：
-  - 华为HIS Terraform Provider可用
-  - 必要的模板文件存在
+  - 转换规则文件可用
+  - 模板文件存在
+  - （可选）dependencies.json 存在
 
 #### 执行步骤
-1. **分析资源清单**
-   - 解析资源清单文件
-   - 识别资源类型和配置
-   - 分析依赖关系
+1. **获取资源数据**
+   - 默认从缓存读取：`.deployment-kit/cache/{appid}/resources.json`
+   - 支持 `--fresh` 强制刷新：重新调用 discover-resources
+   - 支持 `--no-cache` 直接调用 MCP 服务
+   - 验证数据完整性和格式
 
-2. **选择生成策略**
-   - 确定XaC格式（YAML包装Terraform）
-   - 选择模块化策略
-   - 规划变量和输出
+2. **读取依赖关系**（可选）
+   - 检查 `.deployment-kit/dependencies.json` 是否存在
+   - 如存在，加载依赖关系配置
+   - 如不存在，警告用户（生成的 XaC 不包含 depends_on）
 
-3. **生成YAML配置**
-   - 生成主配置文件
-   - 生成变量定义
-   - 生成输出定义
-   - 生成依赖编排
+3. **应用转换规则**（核心步骤）
+   - 遍历每个资源
+   - 资源类型映射：HIS 资源类型 → XaC 资源类型
+   - 属性映射：HIS 资源属性 → XaC 资源参数
+   - 数据类型转换：字符串、数字、列表等
+   - 添加必要字段：默认值、标签、元数据等
+   - 依赖关系映射：dependencies.json → XaC depends_on
 
-4. **生成底层Terraform**
-   - 从YAML转换为Terraform HCL
-   - 生成Provider配置
-   - 生成资源定义
+4. **生成 XaC 代码**
+   - 生成 YAML 配置文件（用户友好格式）
+     - main.yaml：主配置文件
+     - variables.yaml：变量定义
+     - outputs.yaml：输出定义
+   - 生成 Terraform HCL 文件（底层实现）
+     - main.tf：Terraform 配置
+     - variables.tf：变量定义
+     - outputs.tf：输出定义
+   - 应用命名规范和最佳实践
+   - 添加注释和文档
 
-5. **生成元数据**
-   - 添加注释说明
-   - 生成文档
-   - 添加版本信息
+5. **验证生成的代码**
+   - YAML 格式检查
+   - Terraform 语法验证（terraform fmt、terraform validate）
+   - 命名规范检查
+   - 必要字段完整性检查
+
+6. **保存到项目目录**
+   - 创建输出目录：`xac/`
+   - 保存所有生成的文件
+   - 生成 README.md 说明文档
+   - 更新执行状态：`.deployment-kit/state.json`
 
 #### 验证标准
 - **成功指标**：
   - 代码生成成功率 > 98%
+  - 代码语法正确率 > 99%
+  - 代码可直接使用率 > 95%
+- **验证方法**：
+  - YAML 格式检查通过
+  - Terraform validate 通过
+  - Terraform fmt 通过
+  - 必要字段完整
+- **输出结果**：
+  - XaC 代码包：`xac/` 目录
+  - 生成报告：资源转换统计
+  - 下一步操作建议
+
+#### 后置动作
+- **清理**：
+  - 清理临时文件
+  - 清理生成缓存
+- **通知**：
+  - 显示生成完成通知
+  - 显示生成的文件列表
+  - 提示下一步操作（validate-syntax → validate-plan → deploy）
+- **记录**：
+  - 更新 `.deployment-kit/state.json`
+  - 记录生成历史
+
+#### 数据获取策略
+
+```python
+# 缓存策略：混合模式（推荐）
+def generate_xac(appid, mode='hybrid'):
+    """生成 XaC 代码"""
+
+    # 1. 获取资源数据
+    if mode == 'no-cache':
+        # 直接调用 MCP，不使用缓存
+        resources = discover_resources(appid, mode='fresh')
+    elif mode == 'fresh':
+        # 强制刷新缓存后生成
+        resources = discover_resources(appid, mode='fresh')
+    else:
+        # hybrid（默认）：优先使用缓存
+        resources = discover_resources(appid, mode='hybrid')
+
+    # 2. 读取依赖关系
+    dependencies = load_dependencies()
+
+    # 3. 应用转换规则
+    xac_code = apply_conversion_rules(resources, dependencies)
+
+    # 4. 生成文件
+    save_xac_files(xac_code)
+
+    return xac_code
+```
+
+#### 转换规则（核心本质）
+
+**转换规则定义：** 资源 → XaC 的映射逻辑
+
+```yaml
+转换规则分类：
+  1. 基础映射规则：
+     • 资源类型映射：HIS 类型 → XaC 类型
+     • 属性名称映射：HIS 属性 → XaC 参数
+     • 数据类型转换：字符串、数字、布尔等
+
+  2. 增强规则：
+     • 添加必要字段：默认值、标签、描述
+     • 生成变量引用：可配置化
+     • 生成输出定义：便于查询
+
+  3. 最佳实践：
+     • 命名规范：资源命名、变量命名
+     • 注释规范：代码注释、文档说明
+     • 文件组织：模块化、层次化
+
+  4. 特殊处理：
+     • 复杂对象展开：嵌套结构扁平化
+     • 条件逻辑：根据条件生成不同代码
+     • 自定义逻辑：用户指定的转换逻辑
+```
+
+#### 输出文件结构
+
+```
+项目目录/
+├── .deployment-kit/
+│   ├── cache/{appid}/              # 输入数据
+│   ├── dependencies.json            # 依赖关系
+│   └── state.json                  # 执行状态
+│
+└── xac/                            # 生成的 XaC 代码 ⭐
+    ├── README.md                    # 使用说明
+    ├── main.yaml                    # 主配置（YAML）
+    ├── variables.yaml               # 变量定义
+    ├── outputs.yaml                 # 输出定义
+    └── terraform/                   # Terraform 实现
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
+```
   - 代码语法正确率 > 99%
   - 代码可执行率 > 95%
 - **验证方法**：
