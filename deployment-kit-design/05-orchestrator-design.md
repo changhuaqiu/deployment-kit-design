@@ -358,6 +358,315 @@ context:
 
 ---
 
+## 入口层集成和智能功能
+
+### 与入口层的协作
+
+编排器需要与入口层（CLI/Web UI）紧密协作，提供智能化的用户体验：
+
+```
+入口层 → 编排器 → 技能层
+  ↓        ↓        ↓
+用户交互  智能编排  执行任务
+检查条件  管理状态  调用服务
+提供选项  传递数据  返回结果
+```
+
+### 智能缓存策略管理
+
+编排器根据技能类型和当前状态，智能确定缓存策略：
+
+```python
+class CacheStrategyManager:
+    """缓存策略管理器"""
+
+    def determine_cache_mode(self, skill, params, state):
+        """智能确定缓存模式"""
+
+        # 规则1: generate-xac 默认使用缓存
+        if skill == 'generate-xac':
+            appid = params.get('appid')
+            cache_dir = Path(state['data_dir']) / 'cache' / appid
+
+            if not cache_dir.exists():
+                # 缓存不存在，自动 discover
+                return {
+                    'mode': 'fresh',
+                    'reason': 'cache_not_exist',
+                    'auto_action': 'discover',
+                    'message': '缓存不存在，将自动调用 discover-resources'
+                }
+
+            # 检查缓存过期
+            manifest = load_json(cache_dir / 'manifest.json')
+            if is_cache_expired(manifest):
+                return {
+                    'mode': 'stale_cache',
+                    'cached_at': manifest['cache_info']['cached_at'],
+                    'expires_at': manifest['cache_info']['expires_at'],
+                    'message': '缓存已过期，建议刷新',
+                    'user_choice': True  # 让用户选择
+                }
+
+            # 缓存有效
+            return {
+                'mode': 'cache',
+                'cached_at': manifest['cache_info']['cached_at'],
+                'message': '使用缓存数据'
+            }
+
+        # 规则2: validate-plan 总是使用实时数据
+        if skill == 'validate-plan':
+            return {
+                'mode': 'fresh',
+                'reason': 'realtime_required',
+                'message': '计划验证需要最新数据'
+            }
+
+        # 默认混合模式
+        return {
+            'mode': 'hybrid',
+            'message': '混合模式：优先缓存'
+        }
+```
+
+### 前置条件智能检查
+
+编排器在执行技能前，自动检查前置条件：
+
+```python
+class PreFlightChecker:
+    """前置条件检查器"""
+
+    def check_all(self, skill, params, state):
+        """执行所有前置检查"""
+
+        checks = []
+
+        # 检查1: 项目初始化
+        checks.append(self.check_project_initialized(state))
+
+        # 检查2: 技能特定前置条件
+        skill_checks = self.get_skill_checks(skill, params)
+        checks.extend(skill_checks)
+
+        # 检查3: 数据依赖
+        data_checks = self.check_data_dependencies(skill, params, state)
+        checks.extend(data_checks)
+
+        return checks
+
+    def check_data_dependencies(self, skill, params, state):
+        """检查数据依赖"""
+
+        checks = []
+
+        # generate-xac 需要 discover-resources 的输出
+        if skill == 'generate-xac':
+            appid = params.get('appid')
+            cache_dir = Path(state['data_dir']) / 'cache' / appid
+
+            if not cache_dir.exists():
+                checks.append({
+                    'type': 'error',
+                    'category': 'prerequisite',
+                    'message': f'未找到资源数据 (appid: {appid})',
+                    'solution': f'请先运行: dk discover --appid {appid}',
+                    'auto_fix': True,
+                    'fix_action': 'discover-resources'
+                })
+            else:
+                # 检查缓存过期
+                manifest = load_json(cache_dir / 'manifest.json')
+                if is_cache_expired(manifest):
+                    checks.append({
+                        'type': 'warning',
+                        'category': 'cache',
+                        'message': f'资源数据已过期 (appid: {appid})',
+                        'solution': f'建议运行: dk discover --appid {appid} --refresh',
+                        'auto_fix': True,
+                        'fix_action': 'refresh-cache'
+                    })
+
+        return checks
+```
+
+### 状态持久化和进度跟踪
+
+编排器负责管理执行状态，支持断点续传：
+
+```python
+class StateManager:
+    """状态管理器"""
+
+    def load_state(self, data_dir):
+        """加载项目状态"""
+
+        state_file = Path(data_dir) / 'state.json'
+
+        if not state_file.exists():
+            # 创建初始状态
+            return {
+                'project_id': Path(data_dir).parent.name,
+                'initialized_at': datetime.now().isoformat(),
+                'last_operation': None,
+                'workflow_state': {
+                    'current_workflow': None,
+                    'current_phase': 'initialized',
+                    'completed_skills': [],
+                    'pending_skills': [],
+                    'total_progress': 0.0
+                }
+            }
+
+        return load_json(state_file)
+
+    def update_state(self, skill, result):
+        """更新执行状态"""
+
+        self.state['last_operation'] = {
+            'skill': skill,
+            'timestamp': datetime.now().isoformat(),
+            'status': 'completed',
+            'result': result
+        }
+
+        # 更新工作流进度
+        if skill not in self.state['workflow_state']['completed_skills']:
+            self.state['workflow_state']['completed_skills'].append(skill)
+
+        if skill in self.state['workflow_state']['pending_skills']:
+            self.state['workflow_state']['pending_skills'].remove(skill)
+
+        # 计算总进度
+        total = len(self.state['workflow_state']['completed_skills']) + \
+                len(self.state['workflow_state']['pending_skills'])
+        if total > 0:
+            self.state['workflow_state']['total_progress'] = \
+                len(self.state['workflow_state']['completed_skills']) / total
+
+        self.save_state()
+
+    def can_resume_workflow(self, workflow_name):
+        """检查是否可以恢复工作流"""
+
+        if self.state['workflow_state']['current_workflow'] != workflow_name:
+            return False
+
+        if len(self.state['workflow_state']['pending_skills']) == 0:
+            return False
+
+        return True
+```
+
+### 用户交互协调
+
+编排器与入口层协作，提供友好的用户交互：
+
+```python
+class UserInteractionCoordinator:
+    """用户交互协调器"""
+
+    def present_check_results(self, checks):
+        """展示检查结果并获取用户决策"""
+
+        if not checks:
+            print("✓ 所有检查通过")
+            return True
+
+        # 展示检查结果
+        self.display_checks(checks)
+
+        # 错误处理
+        error_count = sum(1 for c in checks if c['type'] == 'error')
+        if error_count > 0:
+            print(f"\n❌ 发现 {error_count} 个错误，无法继续。")
+            return False
+
+        # 警告处理
+        warning_count = sum(1 for c in checks if c['type'] == 'warning')
+        if warning_count > 0:
+            choice = input("\n是否继续？[y/N]: ")
+            return choice.lower() == 'y'
+
+        return True
+
+    def offer_auto_fix(self, checks):
+        """提供自动修复选项"""
+
+        fixable_checks = [c for c in checks if c.get('auto_fix')]
+
+        if not fixable_checks:
+            return False
+
+        print("\n可自动修复的问题：")
+        for i, check in enumerate(fixable_checks, 1):
+            print(f"  {i}. {check['message']}")
+            print(f"     修复操作: {check.get('fix_action', 'unknown')}")
+
+        choice = input("\n是否自动修复？[Y/n]: ")
+        if choice.lower() == 'y':
+            return True
+
+        return False
+```
+
+### 智能工作流编排
+
+编排器支持智能工作流，可以根据状态自动调整：
+
+```python
+class SmartWorkflowExecutor:
+    """智能工作流执行器"""
+
+    def execute_workflow(self, workflow, params, state):
+        """执行智能工作流"""
+
+        # 检查是否可以恢复
+        if self.can_resume(workflow, state):
+            print(f"→ 检测到未完成的工作流: {workflow['name']}")
+            print(f"   已完成: {', '.join(state['workflow_state']['completed_skills'])}")
+            print(f"   待执行: {', '.join(state['workflow_state']['pending_skills'])}")
+
+            choice = input("\n是否继续？[Y/n]: ")
+            if choice.lower() != 'y':
+                return
+
+            # 从断点恢复
+            start_index = self.find_resume_point(workflow, state)
+            steps = workflow['steps'][start_index:]
+        else:
+            steps = workflow['steps']
+
+        # 执行工作流步骤
+        for i, step in enumerate(steps):
+            skill = step['skill']
+            step_params = {**params, **step.get('params', {})}
+
+            # 检查是否需要暂停
+            if step.get('stop_here', False):
+                print(f"\n⏸️  工作流暂停于: {skill}")
+                print(f"   说明: {step.get('stop_reason', '用户交互')}")
+                print(f"   使用 'dk workflow resume {workflow['name']}' 继续")
+                break
+
+            # 执行技能
+            try:
+                result = self.execute_skill(skill, step_params, state)
+
+                # 更新状态
+                state['workflow_state']['completed_skills'].append(skill)
+
+            except Exception as e:
+                print(f"\n❌ 执行失败: {skill}")
+                print(f"   错误: {str(e)}")
+                print(f"\n工作流已暂停，状态已保存")
+                print(f"   使用 'dk workflow resume {workflow['name']}' 继续")
+                raise
+```
+
+---
+
 ## 执行流程
 
 ### 标准执行流程

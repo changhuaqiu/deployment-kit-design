@@ -51,6 +51,341 @@
 
 ---
 
+## 编排器集成
+
+本章节说明技能如何与编排器和入口层集成，确保良好的用户体验。
+
+### 编排器接口要求
+
+每个技能需要提供以下接口以便编排器调用：
+
+```
+技能接口：
+├── execute(context, params)    # 执行技能
+├── validate_input(params)      # 验证输入参数
+├── check_prerequisites(context) # 检查前置条件
+└── get_output_schema()         # 获取输出格式
+```
+
+### 编排器集成要点
+
+#### 1. 数据传递
+
+**输入数据**（从编排器接收）：
+```python
+context = {
+    'working_dir': '/path/to/project/',      # 项目工作目录
+    'data_dir': '/path/to/project/.deployment-kit/',  # 数据目录
+    'state': {...},                             # 项目状态
+    'params': {...}                             # 用户参数
+}
+```
+
+**输出数据**（返回给编排器）：
+```python
+result = {
+    'status': 'success' | 'failed',
+    'data': {...},          # 技能输出数据
+    'artifacts': [...],     # 生成的文件列表
+    'message': '...',       # 执行消息
+    'next_steps': [...]     # 建议的下一步操作
+}
+```
+
+#### 2. 缓存策略
+
+技能需要支持编排器确定的缓存模式：
+
+```python
+def execute(context, params):
+    """技能执行函数"""
+
+    cache_mode = params.get('mode', 'hybrid')
+
+    if cache_mode == 'fresh':
+        # 强制使用最新数据
+        data = fetch_fresh_data(params['appid'])
+    elif cache_mode == 'no-cache':
+        # 直接调用MCP，不使用缓存
+        data = call_mcp_directly(params['appid'])
+    else:
+        # hybrid（默认）：优先使用缓存
+        data = get_from_cache_or_fetch(params['appid'])
+
+    return process_data(data)
+```
+
+#### 3. 状态更新
+
+技能执行后需要更新项目状态：
+
+```python
+def execute(context, params):
+    """技能执行函数"""
+
+    # 执行技能逻辑
+    result = do_work(params)
+
+    # 更新状态（编排器会自动处理）
+    # 但技能也可以提供状态更新建议
+    state_updates = {
+        'last_operation': {
+            'skill': 'discover-resources',
+            'timestamp': datetime.now().isoformat(),
+            'status': 'completed'
+        }
+    }
+
+    return {
+        'status': 'success',
+        'data': result,
+        'state_updates': state_updates
+    }
+```
+
+#### 4. 错误处理
+
+技能需要返回清晰的错误信息：
+
+```python
+def execute(context, params):
+    """技能执行函数"""
+
+    try:
+        result = do_work(params)
+        return {'status': 'success', 'data': result}
+
+    except MCPServiceError as e:
+        # MCP服务错误
+        return {
+            'status': 'failed',
+            'error_type': 'mcp_service',
+            'error_message': str(e),
+            'suggested_action': 'check_mcp_service'
+        }
+
+    except CacheNotFoundError as e:
+        # 缓存未找到错误
+        return {
+            'status': 'failed',
+            'error_type': 'cache_missing',
+            'error_message': str(e),
+            'suggested_action': f"run discover-resources --appid {params['appid']}",
+            'can_auto_fix': True
+        }
+
+    except Exception as e:
+        # 通用错误
+        return {
+            'status': 'failed',
+            'error_type': 'unknown',
+            'error_message': str(e)
+        }
+```
+
+### 与入口层的协作
+
+#### 前置检查
+
+编排器会在执行技能前进行前置检查，技能需要声明其前置条件：
+
+```python
+# discover-resources 的前置条件声明
+prerequisites = {
+    'project_initialized': True,    # 项目需要已初始化
+    'mcp_service_available': True,  # MCP服务需要可用
+    'data_dir_writable': True       # 数据目录需要可写
+}
+
+# generate-xac 的前置条件声明
+prerequisites = {
+    'project_initialized': True,
+    'discover_executed': True,      # discover-resources 需要先执行
+    'cache_available': True,        # 资源缓存需要存在
+    'dependencies_optional': False  # 依赖关系可选
+}
+```
+
+#### 自动修复提示
+
+某些错误可以自动修复，技能需要提供修复建议：
+
+```python
+# 可自动修复的错误示例
+{
+    'status': 'failed',
+    'error_type': 'cache_missing',
+    'error_message': '未找到资源数据',
+    'can_auto_fix': True,
+    'auto_fix_action': 'discover-resources',
+    'auto_fix_params': {
+        'appid': 'xxx'
+    },
+    'user_prompt': '是否自动调用 discover-resources？[Y/n]'
+}
+```
+
+#### 进度反馈
+
+长时间运行的技能需要提供进度反馈：
+
+```python
+def long_running_skill(context, params):
+    """长时间运行的技能"""
+
+    total_steps = 100
+    for i in range(total_steps):
+        # 执行工作
+        do_step_work(i)
+
+        # 每10%报告一次进度
+        if i % 10 == 0:
+            progress = i / total_steps * 100
+            print(f"进度: {progress:.0f}%")
+
+    return {'status': 'success'}
+```
+
+### 技能编排模式
+
+#### 顺序编排
+
+```python
+# 串行执行技能
+discover_result = execute_skill('discover-resources', params)
+xac_result = execute_skill('generate-xac', {
+    'appid': params['appid'],
+    'data': discover_result['data']  # 使用上一个技能的输出
+})
+```
+
+#### 条件编排
+
+```python
+# 根据条件选择技能
+if validate_syntax_result['status'] == 'success':
+    execute_skill('validate-plan', params)
+else:
+    # 跳到错误处理
+    execute_skill('analyze-failure', {
+        'error': validate_syntax_result['error']
+    })
+```
+
+#### 并发编排
+
+```python
+# 并发执行多个技能
+import concurrent.futures
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    futures = {
+        executor.submit(execute_skill, 'review-code', params),
+        executor.submit(execute_skill, 'check-compliance', params),
+        executor.submit(execute_skill, 'validate-syntax', params)
+    }
+
+    results = {future: future.result() for future in futures}
+```
+
+### 编排器最佳实践
+
+#### 1. 明确的前置条件
+
+每个技能应明确声明其前置条件，便于编排器检查：
+
+```python
+# 在技能定义中声明
+SKILL_INFO = {
+    'name': 'generate-xac',
+    'version': '1.0.0',
+    'prerequisites': [
+        'project_initialized',
+        'discover_executed',
+        'cache_available'
+    ],
+    'optional_prerequisites': [
+        'dependencies'
+    ]
+}
+```
+
+#### 2. 清晰的输入输出
+
+技能应明确说明输入和输出格式：
+
+```python
+# 输入说明
+INPUT_SCHEMA = {
+    'appid': {
+        'type': 'string',
+        'required': True,
+        'description': '应用ID'
+    },
+    'mode': {
+        'type': 'string',
+        'required': False,
+        'default': 'hybrid',
+        'description': '缓存模式: cache/fresh/hybrid'
+    }
+}
+
+# 输出说明
+OUTPUT_SCHEMA = {
+    'status': 'string',
+    'data': {
+        'xac_code': 'object',
+        'files': ['list', 'string']
+    },
+    'artifacts': ['string']  # 生成的文件路径列表
+}
+```
+
+#### 3. 友好的错误信息
+
+技能应返回清晰的错误信息和建议：
+
+```python
+# 好的错误信息
+{
+    'status': 'failed',
+    'error_type': 'cache_expired',
+    'error_message': '资源数据已过期（缓存于 2 小时前）',
+    'impact': '可能使用过时的资源数据生成 XaC',
+    'suggested_action': '运行 dk discover --appid xxx --refresh',
+    'user_choice': True  # 可以让用户选择是否继续
+}
+```
+
+#### 4. 状态感知
+
+技能应感知项目状态，提供智能行为：
+
+```python
+def execute(context, params):
+    """感知项目状态的技能执行"""
+
+    state = context['state']
+
+    # 检查是否首次执行
+    if 'discover-resources' not in state['workflow_state']['completed_skills']:
+        print("⚠️  检测到首次执行，将自动调用 discover-resources")
+        # 自动调用前置技能
+        discover_result = execute_skill('discover-resources', params)
+
+    # 检查是否有依赖关系
+    deps_file = Path(context['data_dir']) / 'dependencies.json'
+    if not deps_file.exists():
+        print("⚠️  未找到依赖关系文件")
+        print("   建议运行: dk dependencies edit --appid xxx")
+        # 提供选择机会
+        # ...
+
+    return execute_core_logic(params)
+```
+
+---
+
 ## 核心技能（9个）
 
 ### 1. discover-resources（资源发现）
