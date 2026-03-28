@@ -1,0 +1,10 @@
+# Deployment Kit 核心依赖
+
+# 日志
+structlog>=24.1.0
+
+# YAML 处理
+pyyaml>=6.0
+
+# HTTP 请求
+requests>=2.31.0

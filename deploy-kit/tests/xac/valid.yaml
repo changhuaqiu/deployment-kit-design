@@ -1,0 +1,14 @@
+# 正确的 YAML 文件示例
+resource:
+  huaweicloud_cce_cluster:
+    ads:
+      name: "my-cluster"
+      flavor_id: "s2.large.2"
+      node_count: 2
+      vpc_id: "vpc-001"
+
+data:
+  "huaweicloud_vpc":
+    main:
+      name: "main-vpc"
+      cidr: "192.168.0.0/16"

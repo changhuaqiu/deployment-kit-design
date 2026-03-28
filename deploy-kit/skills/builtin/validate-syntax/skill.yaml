@@ -1,0 +1,39 @@
+# 技能元数据
+name: validate-syntax
+version: 1.0.0
+description: 校验 XaC 制品中的 YAML 文件语法
+author: Deployment Kit Team
+
+# 前置条件
+pre_conditions:
+  requires_artifact: true    # 需要制品输入
+
+# 能力声明
+capabilities:
+  - 校验 YAML 文件语法
+  - 支持多种输入源（URL/ZIP/目录）
+  - 提供详细的错误报告
+  - 安全的 YAML 解析（防止 RCE）
+
+# 输入定义
+inputs:
+  artifact_source:
+    type: string
+    required: true
+    description: XaC 制品来源（URL/ZIP路径/目录路径）
+  
+  download_timeout:
+    type: integer
+    required: false
+    description: 下载超时时间（秒）
+    default: 300
+
+# 输出定义
+outputs:
+  validation_result:
+    type: object
+    description: 校验结果，包含 valid/total_files/valid_files/invalid_files/errors 字段
+
+  artifact_info:
+    type: object
+    description: 制品处理信息，包含 source_type/processed_path/yaml_files_found 字段

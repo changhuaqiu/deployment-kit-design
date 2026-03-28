@@ -1,0 +1,45 @@
+name: discover-resources
+version: 1.0.0
+description: Collect existing resources from HuaweiHIS platform via MCP service
+author: Deployment Kit Team
+
+pre_conditions:
+  requires_mcp: true
+  requires_appid: true
+
+capabilities:
+  - mcp_integration
+  - resource_collection
+  - caching
+  - progress_reporting
+
+inputs:
+  resource_types:
+    type: array
+    required: false
+    description: Resource types to collect
+
+  cache_ttl:
+    type: integer
+    required: false
+    default: 3600
+    description: Cache TTL in seconds
+
+  enable_progress:
+    type: boolean
+    required: false
+    default: false
+    description: Enable progress display
+
+outputs:
+  manifest:
+    type: object
+    description: Collection metadata
+
+  resources:
+    type: object
+    description: Resources grouped by type
+
+  errors:
+    type: array
+    description: List of errors
