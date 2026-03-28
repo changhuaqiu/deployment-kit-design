@@ -51,6 +51,341 @@
 
 ---
 
+## 编排器集成
+
+本章节说明技能如何与编排器和入口层集成，确保良好的用户体验。
+
+### 编排器接口要求
+
+每个技能需要提供以下接口以便编排器调用：
+
+```
+技能接口：
+├── execute(context, params)    # 执行技能
+├── validate_input(params)      # 验证输入参数
+├── check_prerequisites(context) # 检查前置条件
+└── get_output_schema()         # 获取输出格式
+```
+
+### 编排器集成要点
+
+#### 1. 数据传递
+
+**输入数据**（从编排器接收）：
+```python
+context = {
+    'working_dir': '/path/to/project/',      # 项目工作目录
+    'data_dir': '/path/to/project/.deployment-kit/',  # 数据目录
+    'state': {...},                             # 项目状态
+    'params': {...}                             # 用户参数
+}
+```
+
+**输出数据**（返回给编排器）：
+```python
+result = {
+    'status': 'success' | 'failed',
+    'data': {...},          # 技能输出数据
+    'artifacts': [...],     # 生成的文件列表
+    'message': '...',       # 执行消息
+    'next_steps': [...]     # 建议的下一步操作
+}
+```
+
+#### 2. 缓存策略
+
+技能需要支持编排器确定的缓存模式：
+
+```python
+def execute(context, params):
+    """技能执行函数"""
+
+    cache_mode = params.get('mode', 'hybrid')
+
+    if cache_mode == 'fresh':
+        # 强制使用最新数据
+        data = fetch_fresh_data(params['appid'])
+    elif cache_mode == 'no-cache':
+        # 直接调用MCP，不使用缓存
+        data = call_mcp_directly(params['appid'])
+    else:
+        # hybrid（默认）：优先使用缓存
+        data = get_from_cache_or_fetch(params['appid'])
+
+    return process_data(data)
+```
+
+#### 3. 状态更新
+
+技能执行后需要更新项目状态：
+
+```python
+def execute(context, params):
+    """技能执行函数"""
+
+    # 执行技能逻辑
+    result = do_work(params)
+
+    # 更新状态（编排器会自动处理）
+    # 但技能也可以提供状态更新建议
+    state_updates = {
+        'last_operation': {
+            'skill': 'discover-resources',
+            'timestamp': datetime.now().isoformat(),
+            'status': 'completed'
+        }
+    }
+
+    return {
+        'status': 'success',
+        'data': result,
+        'state_updates': state_updates
+    }
+```
+
+#### 4. 错误处理
+
+技能需要返回清晰的错误信息：
+
+```python
+def execute(context, params):
+    """技能执行函数"""
+
+    try:
+        result = do_work(params)
+        return {'status': 'success', 'data': result}
+
+    except MCPServiceError as e:
+        # MCP服务错误
+        return {
+            'status': 'failed',
+            'error_type': 'mcp_service',
+            'error_message': str(e),
+            'suggested_action': 'check_mcp_service'
+        }
+
+    except CacheNotFoundError as e:
+        # 缓存未找到错误
+        return {
+            'status': 'failed',
+            'error_type': 'cache_missing',
+            'error_message': str(e),
+            'suggested_action': f"run discover-resources --appid {params['appid']}",
+            'can_auto_fix': True
+        }
+
+    except Exception as e:
+        # 通用错误
+        return {
+            'status': 'failed',
+            'error_type': 'unknown',
+            'error_message': str(e)
+        }
+```
+
+### 与入口层的协作
+
+#### 前置检查
+
+编排器会在执行技能前进行前置检查，技能需要声明其前置条件：
+
+```python
+# discover-resources 的前置条件声明
+prerequisites = {
+    'project_initialized': True,    # 项目需要已初始化
+    'mcp_service_available': True,  # MCP服务需要可用
+    'data_dir_writable': True       # 数据目录需要可写
+}
+
+# generate-xac 的前置条件声明
+prerequisites = {
+    'project_initialized': True,
+    'discover_executed': True,      # discover-resources 需要先执行
+    'cache_available': True,        # 资源缓存需要存在
+    'dependencies_optional': False  # 依赖关系可选
+}
+```
+
+#### 自动修复提示
+
+某些错误可以自动修复，技能需要提供修复建议：
+
+```python
+# 可自动修复的错误示例
+{
+    'status': 'failed',
+    'error_type': 'cache_missing',
+    'error_message': '未找到资源数据',
+    'can_auto_fix': True,
+    'auto_fix_action': 'discover-resources',
+    'auto_fix_params': {
+        'appid': 'xxx'
+    },
+    'user_prompt': '是否自动调用 discover-resources？[Y/n]'
+}
+```
+
+#### 进度反馈
+
+长时间运行的技能需要提供进度反馈：
+
+```python
+def long_running_skill(context, params):
+    """长时间运行的技能"""
+
+    total_steps = 100
+    for i in range(total_steps):
+        # 执行工作
+        do_step_work(i)
+
+        # 每10%报告一次进度
+        if i % 10 == 0:
+            progress = i / total_steps * 100
+            print(f"进度: {progress:.0f}%")
+
+    return {'status': 'success'}
+```
+
+### 技能编排模式
+
+#### 顺序编排
+
+```python
+# 串行执行技能
+discover_result = execute_skill('discover-resources', params)
+xac_result = execute_skill('generate-xac', {
+    'appid': params['appid'],
+    'data': discover_result['data']  # 使用上一个技能的输出
+})
+```
+
+#### 条件编排
+
+```python
+# 根据条件选择技能
+if validate_syntax_result['status'] == 'success':
+    execute_skill('validate-plan', params)
+else:
+    # 跳到错误处理
+    execute_skill('analyze-failure', {
+        'error': validate_syntax_result['error']
+    })
+```
+
+#### 并发编排
+
+```python
+# 并发执行多个技能
+import concurrent.futures
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    futures = {
+        executor.submit(execute_skill, 'review-code', params),
+        executor.submit(execute_skill, 'check-compliance', params),
+        executor.submit(execute_skill, 'validate-syntax', params)
+    }
+
+    results = {future: future.result() for future in futures}
+```
+
+### 编排器最佳实践
+
+#### 1. 明确的前置条件
+
+每个技能应明确声明其前置条件，便于编排器检查：
+
+```python
+# 在技能定义中声明
+SKILL_INFO = {
+    'name': 'generate-xac',
+    'version': '1.0.0',
+    'prerequisites': [
+        'project_initialized',
+        'discover_executed',
+        'cache_available'
+    ],
+    'optional_prerequisites': [
+        'dependencies'
+    ]
+}
+```
+
+#### 2. 清晰的输入输出
+
+技能应明确说明输入和输出格式：
+
+```python
+# 输入说明
+INPUT_SCHEMA = {
+    'appid': {
+        'type': 'string',
+        'required': True,
+        'description': '应用ID'
+    },
+    'mode': {
+        'type': 'string',
+        'required': False,
+        'default': 'hybrid',
+        'description': '缓存模式: cache/fresh/hybrid'
+    }
+}
+
+# 输出说明
+OUTPUT_SCHEMA = {
+    'status': 'string',
+    'data': {
+        'xac_code': 'object',
+        'files': ['list', 'string']
+    },
+    'artifacts': ['string']  # 生成的文件路径列表
+}
+```
+
+#### 3. 友好的错误信息
+
+技能应返回清晰的错误信息和建议：
+
+```python
+# 好的错误信息
+{
+    'status': 'failed',
+    'error_type': 'cache_expired',
+    'error_message': '资源数据已过期（缓存于 2 小时前）',
+    'impact': '可能使用过时的资源数据生成 XaC',
+    'suggested_action': '运行 dk discover --appid xxx --refresh',
+    'user_choice': True  # 可以让用户选择是否继续
+}
+```
+
+#### 4. 状态感知
+
+技能应感知项目状态，提供智能行为：
+
+```python
+def execute(context, params):
+    """感知项目状态的技能执行"""
+
+    state = context['state']
+
+    # 检查是否首次执行
+    if 'discover-resources' not in state['workflow_state']['completed_skills']:
+        print("⚠️  检测到首次执行，将自动调用 discover-resources")
+        # 自动调用前置技能
+        discover_result = execute_skill('discover-resources', params)
+
+    # 检查是否有依赖关系
+    deps_file = Path(context['data_dir']) / 'dependencies.json'
+    if not deps_file.exists():
+        print("⚠️  未找到依赖关系文件")
+        print("   建议运行: dk dependencies edit --appid xxx")
+        # 提供选择机会
+        # ...
+
+    return execute_core_logic(params)
+```
+
+---
+
 ## 核心技能（9个）
 
 ### 1. discover-resources（资源发现）
@@ -62,131 +397,280 @@
   - "分析当前部署"
   - "查看资源清单"
 - **工作流调用**：作为新用户流程的起点
-- **事件触发**：定期资源扫描任务
+- **Agent调用**：Agent在项目目录下执行资源发现
 
 #### 前置检查
 - **环境检查**：
-  - 华为HIS访问凭证有效
+  - MCP服务连接正常
   - 网络连通性正常
-  - 必要的API权限已授予
-- **依赖检查**：
-  - 华为HIS SDK可用
-  - 配置文件存在
+  - 项目目录可写
 - **参数验证**：
-  - 区域信息有效
-  - 过滤条件合法
+  - appid 参数有效
+  - 缓存模式参数正确（cache/fresh/hybrid）
+- **依赖检查**：
+  - 项目数据目录可创建（.deployment-kit/）
+  - MCP服务tools可用
 
 #### 执行步骤
-1. **连接华为HIS API**
-   - 使用访问凭证建立连接
-   - 验证连接有效性
+1. **检查项目缓存**
+   - 读取项目目录：`.deployment-kit/cache/{appid}/`
+   - 检查缓存是否存在
+   - 检查缓存是否过期（TTL）
+   - 根据缓存模式决定是否使用缓存
 
-2. **扫描指定区域资源**
-   - ADS集群、工作负载、服务
-   - ADS集群资源
-   - ELB实例、监听器
-   - RDS实例、数据库
-   - Redis实例
-   - VPC、子网、安全组
+2. **调用MCP服务获取资源数据**
+   - 调用资源统计接口：获取appid下的资源总数
+   - 遍历调用各个tools获取详细数据：
+     - Tool 1: 获取ADS资源列表
+     - Tool 2: 获取配置资源列表
+     - Tool 3: 获取其他类型资源
+     - ...
+   - 聚合所有资源数据
 
-3. **收集资源配置信息**
-   - 资源基本信息
-   - 配置参数
-   - 标签和元数据
-   - 依赖关系
+3. **数据处理和格式化**
+   - 统一数据格式（JSON）
+   - 补充资源元数据（时间戳、版本等）
+   - 生成资源清单（按类型分类）
+   - **不做依赖关系推断和DAG生成**
 
-4. **分析资源间关系**
-   - 命名推断
-   - 标签推断
-   - 配置引用推断
-   - 生成依赖关系图（DAG）
+4. **保存到项目缓存**
+   - 创建/更新项目目录：`.deployment-kit/cache/{appid}/`
+   - 保存 `manifest.json`（资源清单总览）
+   - 保存 `resources.json`（完整资源数据）
+   - 保存 `metadata.json`（缓存元数据：时间、TTL等）
+   - 检查是否存在 `dependencies.json`，如不存在则提示用户
 
-5. **生成资源清单**
-   - 按类型分类
-   - 生成结构化清单
-   - 计算执行顺序
+5. **输出结果**
+   - 资源统计摘要（数量、类型分布）
+   - 缓存位置和状态
+   - 下一步操作建议
+   - 如果有 `dependencies.json`，显示依赖关系摘要
 
 #### 验证标准
 - **成功指标**：
-  - 扫描成功率 > 99%
-  - 资源发现完整性 > 95%
-  - 依赖推断准确率 > 80%
+  - MCP服务调用成功率 > 99%
+  - 资源数据完整性 = 100%
+  - 缓存写入成功率 = 100%
 - **验证方法**：
-  - 对比华为HIS控制台资源数量
-  - 验证关键资源存在性
-  - 检查依赖关系合理性
+  - 验证缓存文件存在且格式正确
+  - 验证资源数量与MCP返回一致
+  - 验证元数据完整
 - **输出结果**：
-  - 资源清单文件（JSON/YAML）
-  - 依赖关系图（DAG）
-  - 扫描报告
+  - 项目缓存：`.deployment-kit/cache/{appid}/`
+  - 资源清单：`manifest.json`
+  - 资源数据：`resources.json`
+  - 缓存元数据：`metadata.json`
 
 #### 后置动作
 - **清理**：
-  - 清理临时缓存
-  - 释放API连接
+  - 清理临时数据
+  - 释放MCP连接
 - **通知**：
-  - 发送扫描完成通知
-  - 资源数量统计
-  - 异常情况告警
+  - 显示资源发现完成通知
+  - 显示缓存位置
+  - 提示编辑依赖关系（如果需要）
 - **记录**：
-  - 记录扫描历史
-  - 保存扫描日志
+  - 更新 `.deployment-kit/state.json`（技能执行状态）
+
+#### 数据存储
+```
+项目目录/.deployment-kit/
+├── cache/
+│   └── {appid}/
+│       ├── manifest.json      # 资源清单
+│       ├── resources.json     # 完整数据
+│       └── metadata.json      # 缓存元数据
+├── dependencies.json          # 依赖关系（人工指定）
+└── state.json                # 执行状态
+```
+
+#### 缓存策略
+- **混合模式**（默认）：
+  - 优先使用项目缓存
+  - 缓存过期时提示用户是否刷新
+  - 支持 `--refresh` 强制刷新
+  - 支持 `--no-cache` 直接调用MCP
+- **TTL**：默认3600秒（1小时），可配置
+- **缓存隔离**：按项目目录隔离，不同项目不共享
 
 ---
 
 ### 2. generate-xac（XaC生成）
 
+#### 使用场景
+**典型用户故事**：用户从未写过 XaC 代码，但现网有 HIS 资源，希望通过这个 skill 快速将现网资源转换为 XaC 代码，通过验证后可以执行部署。
+
+**核心价值**：实现从"手动管理"到"代码化管理"的关键转换
+
 #### 触发条件
 - **用户意图**：
   - "生成XaC代码"
-  - "从资源创建XaC"
-  - "转换为XaC格式"
-- **工作流调用**：资源发现后的下一步
-- **前置技能依赖**：discover-resources完成
+  - "从现网资源创建XaC"
+  - "将现网资源代码化"
+- **工作流调用**：discover-resources 之后的下一步
+- **前置技能依赖**：discover-resources 已完成
 
 #### 前置检查
 - **环境检查**：
-  - XaC工具环境可用
-  - Terraform CLI正常
-  - YAML解析器可用
+  - XaC 代码生成工具可用
+  - YAML 解析器可用
+  - 目标目录可写
 - **输入验证**：
-  - 资源清单文件存在
-  - 清单数据格式正确
-  - 目标路径可写
+  - 项目缓存存在：`.deployment-kit/cache/{appid}/resources.json`
+  - 或者支持 `--fresh` 模式重新调用 discover-resources
+  - 资源数据格式正确
 - **依赖检查**：
-  - 华为HIS Terraform Provider可用
-  - 必要的模板文件存在
+  - 转换规则文件可用
+  - 模板文件存在
+  - （可选）dependencies.json 存在
 
 #### 执行步骤
-1. **分析资源清单**
-   - 解析资源清单文件
-   - 识别资源类型和配置
-   - 分析依赖关系
+1. **获取资源数据**
+   - 默认从缓存读取：`.deployment-kit/cache/{appid}/resources.json`
+   - 支持 `--fresh` 强制刷新：重新调用 discover-resources
+   - 支持 `--no-cache` 直接调用 MCP 服务
+   - 验证数据完整性和格式
 
-2. **选择生成策略**
-   - 确定XaC格式（YAML包装Terraform）
-   - 选择模块化策略
-   - 规划变量和输出
+2. **读取依赖关系**（可选）
+   - 检查 `.deployment-kit/dependencies.json` 是否存在
+   - 如存在，加载依赖关系配置
+   - 如不存在，警告用户（生成的 XaC 不包含 depends_on）
 
-3. **生成YAML配置**
-   - 生成主配置文件
-   - 生成变量定义
-   - 生成输出定义
-   - 生成依赖编排
+3. **应用转换规则**（核心步骤）
+   - 遍历每个资源
+   - 资源类型映射：HIS 资源类型 → XaC 资源类型
+   - 属性映射：HIS 资源属性 → XaC 资源参数
+   - 数据类型转换：字符串、数字、列表等
+   - 添加必要字段：默认值、标签、元数据等
+   - 依赖关系映射：dependencies.json → XaC depends_on
 
-4. **生成底层Terraform**
-   - 从YAML转换为Terraform HCL
-   - 生成Provider配置
-   - 生成资源定义
+4. **生成 XaC 代码**
+   - 生成 YAML 配置文件（用户友好格式）
+     - main.yaml：主配置文件
+     - variables.yaml：变量定义
+     - outputs.yaml：输出定义
+   - 生成 Terraform HCL 文件（底层实现）
+     - main.tf：Terraform 配置
+     - variables.tf：变量定义
+     - outputs.tf：输出定义
+   - 应用命名规范和最佳实践
+   - 添加注释和文档
 
-5. **生成元数据**
-   - 添加注释说明
-   - 生成文档
-   - 添加版本信息
+5. **验证生成的代码**
+   - YAML 格式检查
+   - Terraform 语法验证（terraform fmt、terraform validate）
+   - 命名规范检查
+   - 必要字段完整性检查
+
+6. **保存到项目目录**
+   - 创建输出目录：`xac/`
+   - 保存所有生成的文件
+   - 生成 README.md 说明文档
+   - 更新执行状态：`.deployment-kit/state.json`
 
 #### 验证标准
 - **成功指标**：
   - 代码生成成功率 > 98%
+  - 代码语法正确率 > 99%
+  - 代码可直接使用率 > 95%
+- **验证方法**：
+  - YAML 格式检查通过
+  - Terraform validate 通过
+  - Terraform fmt 通过
+  - 必要字段完整
+- **输出结果**：
+  - XaC 代码包：`xac/` 目录
+  - 生成报告：资源转换统计
+  - 下一步操作建议
+
+#### 后置动作
+- **清理**：
+  - 清理临时文件
+  - 清理生成缓存
+- **通知**：
+  - 显示生成完成通知
+  - 显示生成的文件列表
+  - 提示下一步操作（validate-syntax → validate-plan → deploy）
+- **记录**：
+  - 更新 `.deployment-kit/state.json`
+  - 记录生成历史
+
+#### 数据获取策略
+
+```python
+# 缓存策略：混合模式（推荐）
+def generate_xac(appid, mode='hybrid'):
+    """生成 XaC 代码"""
+
+    # 1. 获取资源数据
+    if mode == 'no-cache':
+        # 直接调用 MCP，不使用缓存
+        resources = discover_resources(appid, mode='fresh')
+    elif mode == 'fresh':
+        # 强制刷新缓存后生成
+        resources = discover_resources(appid, mode='fresh')
+    else:
+        # hybrid（默认）：优先使用缓存
+        resources = discover_resources(appid, mode='hybrid')
+
+    # 2. 读取依赖关系
+    dependencies = load_dependencies()
+
+    # 3. 应用转换规则
+    xac_code = apply_conversion_rules(resources, dependencies)
+
+    # 4. 生成文件
+    save_xac_files(xac_code)
+
+    return xac_code
+```
+
+#### 转换规则（核心本质）
+
+**转换规则定义：** 资源 → XaC 的映射逻辑
+
+```yaml
+转换规则分类：
+  1. 基础映射规则：
+     • 资源类型映射：HIS 类型 → XaC 类型
+     • 属性名称映射：HIS 属性 → XaC 参数
+     • 数据类型转换：字符串、数字、布尔等
+
+  2. 增强规则：
+     • 添加必要字段：默认值、标签、描述
+     • 生成变量引用：可配置化
+     • 生成输出定义：便于查询
+
+  3. 最佳实践：
+     • 命名规范：资源命名、变量命名
+     • 注释规范：代码注释、文档说明
+     • 文件组织：模块化、层次化
+
+  4. 特殊处理：
+     • 复杂对象展开：嵌套结构扁平化
+     • 条件逻辑：根据条件生成不同代码
+     • 自定义逻辑：用户指定的转换逻辑
+```
+
+#### 输出文件结构
+
+```
+项目目录/
+├── .deployment-kit/
+│   ├── cache/{appid}/              # 输入数据
+│   ├── dependencies.json            # 依赖关系
+│   └── state.json                  # 执行状态
+│
+└── xac/                            # 生成的 XaC 代码 ⭐
+    ├── README.md                    # 使用说明
+    ├── main.yaml                    # 主配置（YAML）
+    ├── variables.yaml               # 变量定义
+    ├── outputs.yaml                 # 输出定义
+    └── terraform/                   # Terraform 实现
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
+```
   - 代码语法正确率 > 99%
   - 代码可执行率 > 95%
 - **验证方法**：

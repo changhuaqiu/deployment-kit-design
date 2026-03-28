@@ -1,0 +1,12 @@
+# 括号不匹配的示例
+resource:
+  huaweicloud_cce_cluster:
+    ads:
+      name: "my-cluster"
+      flavor_id: "s2.large.2"
+      node_count: 2
+      vpc_id: "vpc-001"
+# 缺少闭合花括号
+    tags: {
+      "Environment": "test"
+      "Owner": "team"
