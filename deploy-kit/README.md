@@ -10,11 +10,12 @@
 
 ## 🎯 核心特点
 
-- ✅ **技能化**: 将部署流程分解为可组合的技能（20个技能）
+- ✅ **技能化**: 将部署流程分解为可组合的技能（20+个技能，包含智能自动部署）
 - ✅ **可编排**: 通过编排器灵活组合技能
 - ✅ **Agent友好**: 项目级数据存储（`.deployment-kit/`）
 - ✅ **独立套件**: CLI工具，可独立运行
 - ✅ **智能体优化**: 遵循 harness-engineering 最佳实践
+- ✅ **🆕 智能自动部署**: 基于业务规格零门槛自动部署
 
 ---
 
@@ -42,6 +43,14 @@ python examples/state_manager_example.py
 ### 3. 使用 Deployment Kit
 
 ```bash
+# 🆕 智能自动部署（零门槛）
+dk auto-deploy \
+  --service-type "web-service" \
+  --qps 5000 \
+  --dau 100000 \
+  --storage "relational" \
+  --availability "high"
+
 # 发现资源
 dk discover --appid <appid>
 

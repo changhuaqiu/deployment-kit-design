@@ -180,8 +180,10 @@ Deployment Kit 通过"技能化"的方式，解决部署质量控制和部署效
 ```
 开发阶段：
 - discover-resources：发现现网资源
-- generate-xac：生成 XaC 代码
-- update-xac：更新 XaC 代码
+- generate-xac：从现网资源生成 XaC 代码
+- update-xac：更新已有 XaC 代码
+- analyze-business-specs：分析业务规格（智能自动部署）
+- generate-xac-from-specs：从业务规格生成 XaC（智能自动部署）
 
 验证阶段：
 - validate-syntax：校验 XaC 语法
@@ -190,6 +192,7 @@ Deployment Kit 通过"技能化"的方式，解决部署质量控制和部署效
 部署阶段：
 - test-deploy：测试环境部署
 - deploy-production：生产环境部署
+- execute-xac：执行 XaC（智能自动部署）
 
 分析阶段：
 - analyze-failure：分析部署失败
@@ -296,6 +299,24 @@ Deployment Kit 通过"技能化"的方式，解决部署质量控制和部署效
          → (auto-fix) → rollback-deployment
 
 特点：快速诊断和恢复
+```
+
+### 场景 6：智能自动部署（基于业务规格）
+
+```
+用户需求：零基础设施经验，从业务需求自动部署
+
+输入：业务规格（QPS、DAU、存储需求、可用性要求等）
+使用技能：analyze-business-specs → generate-xac-from-specs
+         → validate-xac → execute-xac
+
+特点：
+- 零门槛：用户无需了解云资源或 XaC
+- 端到端自动化：从业务规格到运行中的服务
+- 内化智能：规格匹配逻辑对用户透明
+- 快速部署：分钟级完成
+
+详细说明：参见 [03-scenario-c-intelligent-auto-deploy.md](./03-scenario-c-intelligent-auto-deploy.md)
 ```
 
 ## Deployment Kit 核心能力
