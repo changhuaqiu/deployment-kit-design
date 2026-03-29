@@ -1,6 +1,6 @@
 # 预定义工作流
 
-本文档定义 Deployment Kit 的 8 个预定义工作流，包括技能组合、执行顺序、门控条件和处理逻辑。
+本文档定义 Deployment Kit 的 9 个预定义工作流，包括技能组合、执行顺序、门控条件和处理逻辑。
 
 ## 工作流概述
 
@@ -14,6 +14,7 @@
 6. **validate-only** - 仅验证流程
 7. **canary-deployment** - 灰度发布流程
 8. **emergency-rollback** - 紧急回滚流程
+9. **intelligent-auto-deploy** - 智能自动部署（基于业务规格）🆕
 
 ---
 
@@ -639,6 +640,239 @@ v2.0.0 (重大变更)
 
 ---
 
+### 9. intelligent-auto-deploy（智能自动部署）
+
+#### 概述
+
+**目的**：为零基础设施经验的用户提供端到端自动化部署
+
+**适用场景**：
+- 首次部署微服务，无现网资源
+- 用户不了解云资源或 XaC
+- 快速原型验证
+- 需要从业务需求自动生成基础设施
+
+**核心特点**：
+- ✅ **零门槛**：用户只需提供业务规格（QPS、DAU 等）
+- ✅ **端到端自动化**：从业务规格到运行中的服务
+- ✅ **内化智能**：规格匹配逻辑对用户透明
+- ✅ **快速部署**：分钟级完成
+
+#### 技能序列
+
+```
+analyze-business-specs
+    ↓
+generate-xac-from-specs (内化规格匹配)
+    ↓
+validate-xac
+    ├─ validate-syntax
+    ├─ validate-plan
+    └─ check-compliance
+    ↓
+execute-xac (执行 HEAM 动作)
+    ├─ create-resources
+    ├─ deploy-service
+    └─ verify-deployment
+```
+
+#### 门控条件
+
+| 门控点 | 条件 | 失败处理 |
+|--------|------|---------|
+| validate-xac | 必须通过 | 阻止，显示错误并提供优化建议 |
+| execute-xac | 成功创建资源 | 失败自动回滚 |
+
+#### 输入
+
+```yaml
+business_specs:
+  service:
+    name: "order-service"
+    description: "订单微服务"
+    type: "web-service"
+
+  traffic:
+    qps: 5000              # 每秒请求数
+    peak_qps: 10000        # 峰值 QPS
+    dau: 100000            # 日活用户
+
+  storage:
+    type: "relational"     # 存储类型
+    capacity: "1TB"        # 容量
+    cache: true            # 是否需要缓存
+
+  availability:
+    level: "high"          # 可用性等级
+    sla: "99.9%"           # SLA 目标
+
+  cost:
+    strategy: "performance-first"  # 成本策略
+    budget: "5000/month"           # 预算
+```
+
+#### 预期输出
+
+```yaml
+result:
+  status: "success"
+
+  business_analysis:
+    service_type: "web-service"
+    workload_profile: "io-intensive"
+    availability_requirement: "high"
+
+  xac_artifact:
+    path: "./order-service-xac"
+    resources:
+      compute:
+        - type: "CCE.Deployment"
+          replicas: 5
+          instance_type: "high-io-8c16gb"
+      network:
+        - type: "ELB.LoadBalancer"
+          bandwidth: 20
+          crossAZ: true
+      storage:
+        - type: "RDS.Instance"
+          mode: "master-slave"
+          flavor: "8c32gb"
+          volume: { size: 1000 }
+
+  validation_result:
+    syntax: "passed"
+    plan:
+      resources_to_create: 7
+      estimated_time: "8 minutes"
+      estimated_cost: "¥2,500/month"
+    compliance: "passed"
+
+  execution_result:
+    status: "success"
+    duration: "7m50s"
+
+    actions_executed:
+      - name: create-infrastructure
+        status: "completed"
+        duration: "5m32s"
+      - name: deploy-service
+        status: "completed"
+        duration: "2m18s"
+
+    access_info:
+      service_url: "http://order-service.example.com"
+      database_connection: "mysql-rds-xxx.huaweicloud.com:3306"
+      console_url: "https://console.huaweicloud.com/xxx"
+```
+
+#### 详细说明
+
+**步骤 1：analyze-business-specs**
+```
+功能：分析用户的业务规格
+
+处理：
+├─ 识别服务类型（Web/批处理/数据处理）
+├─ 分析负载特征（CPU密集/IO密集/内存密集）
+├─ 评估可用性要求（标准/高可用/容灾）
+└─ 评估存储需求（数据库类型、缓存、容量）
+
+输出：结构化的业务规格对象（BusinessSpec）
+```
+
+**步骤 2：generate-xac-from-specs**
+```
+功能：基于业务规格直接生成完整的 XaC 制品
+
+内部处理（黑盒）：
+├─ 【内化】规格匹配引擎
+│  └─ 规则库匹配 → 资源规格计算
+├─ 自动选择合适的 XaC 模板
+├─ 填充模板参数
+└─ 添加 HEAM 动作定义
+
+输出：完整的 XaC 代码（包含资源定义 + HEAM 动作）
+```
+
+**步骤 3：validate-xac**
+```
+功能：确保生成的 XaC 代码正确、合规、可执行
+
+校验内容：
+├─ 语法校验（validate-syntax）
+├─ 计划预览（validate-plan）
+└─ 合规检查（check-compliance）
+```
+
+**步骤 4：execute-xac**
+```
+功能：执行 XaC 中的 HEAM 动作，完成资源申请和服务部署
+
+执行流程：
+├─ 解析 XaC 中的 HEAM 动作
+├─ 构建动作执行图（DAG）
+├─ 按拓扑顺序执行
+│  ├─ heam.resource.create（资源申请）
+│  ├─ heam.service.deploy（服务部署）
+│  └─ heam.service.verify（部署验证）
+└─ 错误处理和自动回滚
+```
+
+#### 错误处理
+
+```yaml
+error_handling:
+  analyze-business-specs:
+    on_invalid_input:
+      action: "prompt_for_correction"
+      message: "请提供完整的业务规格信息"
+
+  generate-xac-from-specs:
+    on_no_matching_template:
+      action: "use_default_template"
+      message: "未找到匹配的模板，使用默认模板"
+    on_validation_failure:
+      action: "show_optimization_suggestions"
+      message: "生成的 XaC 存在问题，建议优化"
+
+  validate-xac:
+    on_syntax_error:
+      action: "auto_fix_or_report"
+      message: "语法错误，尝试自动修复"
+    on_compliance_failure:
+      action: "show_compliance_issues"
+      message: "合规检查失败，请查看问题详情"
+
+  execute-xac:
+    on_resource_creation_failure:
+      action: "auto_rollback"
+      message: "资源创建失败，自动回滚已创建的资源"
+    on_deployment_failure:
+      action: "diagnose_and_rollback"
+      message: "部署失败，诊断问题并回滚"
+```
+
+#### 使用示例
+
+```bash
+# CLI 命令
+dk auto-deploy \
+  --service-type "web-service" \
+  --qps 5000 \
+  --dau 100000 \
+  --storage "relational" \
+  --availability "high"
+
+# 或使用配置文件
+dk auto-deploy --config business-specs.yaml
+```
+
+#### 相关文档
+
+- [03-scenario-c-intelligent-auto-deploy.md](./03-scenario-c-intelligent-auto-deploy.md) - 详细场景说明
+
+---
+
 ## 图表
 
 ### 工作流流程图
@@ -653,6 +887,8 @@ v2.0.0 (重大变更)
 
 ## 版本信息
 
-- **文档版本**：1.0.0
+- **文档版本**：1.1.0
 - **创建日期**：2026-03-25
-- **工作流数量**：8 个
+- **更新日期**：2026-03-29
+- **工作流数量**：9 个
+- **变更记录**：新增 intelligent-auto-deploy 工作流
