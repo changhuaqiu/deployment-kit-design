@@ -138,7 +138,8 @@ export function drawConnectionWithFlow(
   fromY: number,
   toX: number,
   toY: number,
-  time: number
+  time: number,
+  zoomScale: number
 ): void {
   // Draw base connection line
   ctx.beginPath()
@@ -149,7 +150,6 @@ export function drawConnectionWithFlow(
   ctx.stroke()
 
   // Don't show particles at world zoom level
-  const zoomScale = 1.0  // Would be passed as parameter
   if (zoomScale < 0.8) return
 
   // Calculate particle position
@@ -162,7 +162,7 @@ export function drawConnectionWithFlow(
   // Draw particle
   ctx.save()
   ctx.beginPath()
-  ctx.fillStyle = connection.type === 'dataflow' ? '#3b82f6' : '#8b5cf6'
+  ctx.fillStyle = connection.type === 'dataflow' ? '#3b82f6' : '#6b7280'
   ctx.arc(particleX, particleY, 4, 0, Math.PI * 2)
   ctx.fill()
 
@@ -170,7 +170,7 @@ export function drawConnectionWithFlow(
   ctx.beginPath()
   ctx.fillStyle = connection.type === 'dataflow'
     ? 'rgba(59, 130, 246, 0.3)'
-    : 'rgba(139, 92, 246, 0.3)'
+    : 'rgba(107, 114, 128, 0.3)'
   ctx.arc(particleX, particleY, 8, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()

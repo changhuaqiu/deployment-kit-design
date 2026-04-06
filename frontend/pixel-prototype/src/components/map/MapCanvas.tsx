@@ -190,7 +190,7 @@ export function MapCanvas({
           zoomScale
         )
 
-        drawConnection(ctx, fromScreen.x, fromScreen.y, toScreen.x, toScreen.y, connection.type, time)
+        drawConnection(ctx, fromScreen.x, fromScreen.y, toScreen.x, toScreen.y, connection.type, time, zoomScale)
       }
     })
 

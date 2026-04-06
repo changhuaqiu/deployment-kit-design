@@ -109,7 +109,8 @@ export function drawConnection(
   toX: number,
   toY: number,
   type: Connection['type'],
-  time: number
+  time: number,
+  zoomScale: number = 1.0
 ): void {
   // Use the new flow animation function
   drawConnectionWithFlow(
@@ -119,6 +120,7 @@ export function drawConnection(
     fromY,
     toX,
     toY,
-    time
+    time,
+    zoomScale
   )
 }
