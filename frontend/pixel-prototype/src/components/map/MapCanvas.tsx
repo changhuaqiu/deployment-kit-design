@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react'
-import type { Building, Connection, ZoomLevel, SelectionState, ViewportState } from '@/types/map'
+import { useEffect, useRef, useCallback, useState } from 'react'
+import type { Building, Connection, ZoomLevel, SelectionState, ViewportState, HoverState } from '@/types/map'
 import { getZoomScale } from '@/types/map'
 import { mapToScreen, screenToMap, pointInRect } from '@/utils/mapCoordinates'
 import { drawBuilding, drawConnection } from '@/utils/mapRendering'
@@ -12,10 +12,12 @@ interface MapCanvasProps {
   viewport: ViewportState
   zoom: ZoomLevel
   selection: SelectionState
+  hovered: HoverState
   onBuildingClick: (buildingId: string) => void
   onAgentClick: (agentId: string) => void
   onViewportChange: (updates: Partial<ViewportState>) => void
   onZoomChange: (zoom: ZoomLevel) => void
+  onHoverChange: (hovered: HoverState) => void
 }
 
 export function MapCanvas({
@@ -25,12 +27,15 @@ export function MapCanvas({
   viewport,
   zoom,
   selection,
+  hovered,
   onBuildingClick,
   onAgentClick,
   onViewportChange,
-  onZoomChange
+  onZoomChange,
+  onHoverChange
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const dragStateRef = useRef<{
     isDragging: boolean
     startX: number
@@ -48,6 +53,40 @@ export function MapCanvas({
   })
 
   const zoomScale = getZoomScale(zoom)
+
+  // Hit detection for hover
+  const detectHover = (clientX: number, clientY: number): HoverState => {
+    const canvas = canvasRef.current
+    if (!canvas) return { type: null, id: null }
+
+    const rect = canvas.getBoundingClientRect()
+    const mouseX = clientX - rect.left
+    const mouseY = clientY - rect.top
+
+    // Convert to map coordinates
+    const mapX = (mouseX + viewport.x) / zoomScale
+    const mapY = (mouseY + viewport.y) / zoomScale
+
+    // Hit detection for buildings
+    for (const building of buildings) {
+      if (pointInRect({ x: mapX, y: mapY }, building.position)) {
+        return { type: 'building', id: building.id }
+      }
+    }
+
+    // Hit detection for agents
+    for (const agent of agents) {
+      if (!agent.position) continue
+      const agentScreenX = (agent.position.x - viewport.x) * zoomScale
+      const agentScreenY = (agent.position.y - viewport.y) * zoomScale
+      const dist = Math.sqrt(Math.pow(mouseX - agentScreenX, 2) + Math.pow(mouseY - agentScreenY, 2))
+      if (dist < 20) {
+        return { type: 'agent', id: agent.id }
+      }
+    }
+
+    return { type: null, id: null }
+  }
 
   // Render function
   const render = useCallback(() => {
@@ -124,6 +163,13 @@ export function MapCanvas({
         return
       }
 
+      // Draw hover highlight
+      if (hovered.type === 'building' && hovered.id === building.id) {
+        ctx.strokeStyle = '#60a5fa'
+        ctx.lineWidth = 3
+        ctx.strokeRect(screenPos.x - 2, screenPos.y - 2, width + 4, height + 4)
+      }
+
       // Draw selection highlight
       if (selection.type === 'building' && selection.id === building.id) {
         ctx.strokeStyle = '#fbbf24'
@@ -154,6 +200,15 @@ export function MapCanvas({
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(agent.icon, screenPos.x, screenPos.y)
+
+      // Draw hover highlight
+      if (hovered.type === 'agent' && hovered.id === agent.id) {
+        ctx.strokeStyle = '#60a5fa'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(screenPos.x, screenPos.y, agentSize / 2 + 3, 0, Math.PI * 2)
+        ctx.stroke()
+      }
 
       // Draw selection highlight
       if (selection.type === 'agent' && selection.id === agent.id) {
@@ -233,14 +288,23 @@ export function MapCanvas({
   // Mouse move handler
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!dragStateRef.current.isDragging) return
-
       const canvas = canvasRef.current
       if (!canvas) return
 
       const rect = canvas.getBoundingClientRect()
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
+
+      setMousePosition({ x: e.clientX, y: e.clientY })
+
+      if (!dragStateRef.current.isDragging) {
+        // Perform hover detection when not dragging
+        const hoverState = detectHover(e.clientX, e.clientY)
+        if (hoverState.type !== hovered.type || hoverState.id !== hovered.id) {
+          onHoverChange(hoverState)
+        }
+        return
+      }
 
       const dx = x - dragStateRef.current.startX
       const dy = y - dragStateRef.current.startY
@@ -252,8 +316,17 @@ export function MapCanvas({
 
       onViewportChange({ x: newViewportX, y: newViewportY })
     },
-    [zoomScale, onViewportChange]
+    [zoomScale, onViewportChange, hovered, onHoverChange]
   )
+
+  // Mouse leave handler
+  const handleMouseLeave = useCallback(() => {
+    if (hovered.type !== null || hovered.id !== null) {
+      onHoverChange({ type: null, id: null })
+    }
+    // Also handle drag state
+    dragStateRef.current.isDragging = false
+  }, [hovered, onHoverChange])
 
   // Mouse up handler
   const handleMouseUp = useCallback(
@@ -344,9 +417,14 @@ export function MapCanvas({
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
       onWheel={handleWheel}
-      style={{ display: 'block', width: '100%', height: '100%' }}
+      style={{
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        cursor: hovered.type ? 'pointer' : 'default'
+      }}
     />
   )
 }

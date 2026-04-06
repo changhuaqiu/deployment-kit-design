@@ -5,7 +5,7 @@ import AgentOfficePanel from '../city/AgentOfficePanel'
 import { DistrictType, AgentRole } from '@/types/agents'
 import { useAgentStore } from '@/store/agents'
 import { useDistrictStore } from '@/store/districts'
-import { useMapStore } from '@/store/mapStore'
+import { useMapStore, type HoverState } from '@/store/mapStore'
 import { districtsToBuildings } from '@/utils/mapRendering'
 
 /**
@@ -20,14 +20,16 @@ export function CityMapComplete() {
   const viewport = useMapStore((state) => state.viewport)
   const zoom = useMapStore((state) => state.zoom)
   const selection = useMapStore((state) => state.selection)
+  const hovered = useMapStore((state) => state.hovered)
   const setViewport = useMapStore((state) => state.setViewport)
   const setZoom = useMapStore((state) => state.setZoom)
   const setSelection = useMapStore((state) => state.setSelection)
+  const setHovered = useMapStore((state) => state.setHovered)
 
   const [buildings, setBuildings] = useState<ReturnType<typeof districtsToBuildings>>([])
 
   // Initialize all districts for test and prod
-  useState(() => {
+  useEffect(() => {
     const cities: Array<'test' | 'prod'> = ['test', 'prod']
     const districtTypes = [DistrictType.COMPUTE, DistrictType.DATA, DistrictType.NETWORK, DistrictType.CONFIG]
 
@@ -41,7 +43,7 @@ export function CityMapComplete() {
     createAgent('scanner-1', AgentRole.SCANNER, '🕵️', '普查员 #1')
     createAgent('planner-1', AgentRole.PLANNER, '👨‍🎨', '规划师 #1')
     createAgent('monitor-1', AgentRole.MONITOR, '👮', '审核员 #1')
-  })
+  }, [])
 
   // Convert districts to buildings when districts change
   useEffect(() => {
@@ -88,10 +90,12 @@ export function CityMapComplete() {
           viewport={viewport}
           zoom={zoom}
           selection={selection}
+          hovered={hovered}
           onBuildingClick={handleBuildingClick}
           onAgentClick={handleAgentClick}
           onViewportChange={setViewport}
           onZoomChange={setZoom}
+          onHoverChange={setHovered}
         />
 
       {/* NEW: MapControls overlay */}
