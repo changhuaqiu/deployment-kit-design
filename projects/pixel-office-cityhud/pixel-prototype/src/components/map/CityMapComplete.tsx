@@ -27,7 +27,7 @@ export function CityMapComplete() {
   const [buildings, setBuildings] = useState<ReturnType<typeof districtsToBuildings>>([])
 
   // Initialize all districts for test and prod
-  useState(() => {
+  useEffect(() => {
     const cities: Array<'test' | 'prod'> = ['test', 'prod']
     const districtTypes = [DistrictType.COMPUTE, DistrictType.DATA, DistrictType.NETWORK, DistrictType.CONFIG]
 
@@ -41,7 +41,7 @@ export function CityMapComplete() {
     createAgent('scanner-1', AgentRole.SCANNER, '🕵️', '普查员 #1')
     createAgent('planner-1', AgentRole.PLANNER, '👨‍🎨', '规划师 #1')
     createAgent('monitor-1', AgentRole.MONITOR, '👮', '审核员 #1')
-  })
+  }, [])
 
   // Convert districts to buildings when districts change
   useEffect(() => {
