@@ -13,11 +13,13 @@ import {
 interface AgentStore {
   // State
   agents: Record<string, Agent>;
+  tasks: Record<string, Task>;
+  selectedAgentId: string | null;
 
   // Actions
   createAgent: (id: string, role: AgentRole, icon: string, name: string) => Agent;
   updateAgent: (id: string, updates: Partial<Agent>) => void;
-  deleteAgent: (id: string) => void;
+  removeAgent: (id: string) => void;
 
   // Task management
   assignTask: (agentId: string, task: Task) => void;
@@ -26,16 +28,18 @@ interface AgentStore {
 
   // Location and movement
   setPathToDistrict: (agentId: string, district: District) => void;
-  updatePosition: (agentId: string, position: Position) => void;
+  updateAgentPosition: (agentId: string, position: Position) => void;
   moveToOffice: (agentId: string) => void;
 
   // State transitions
-  startWorking: (agentId: string) => void;
-  startReturning: (agentId: string) => void;
+  updateAgentState: (agentId: string, state: AgentState) => void;
 
   // UI state
-  setBubble: (agentId: string, bubble: Agent['bubble']) => void;
+  setAgentBubble: (agentId: string, bubble: Agent['bubble']) => void;
   clearBubble: (agentId: string) => void;
+
+  // Selection
+  selectAgent: (agentId: string | null) => void;
 
   // Utilities
   getAgentById: (id: string) => Agent | undefined;
@@ -75,6 +79,8 @@ const generatePathToDistrict = (district: District): Position[] => {
 const createAgentStore = () => create<AgentStore>((set, get) => ({
   // Initial state
   agents: {},
+  tasks: {},
+  selectedAgentId: null,
 
   // Agent creation and management
   createAgent: (id: string, role: AgentRole, icon: string, name: string) => {
@@ -111,7 +117,7 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
     }));
   },
 
-  deleteAgent: (id: string) => {
+  removeAgent: (id: string) => {
     set((state) => {
       const newAgents = { ...state.agents };
       delete newAgents[id];
@@ -205,7 +211,7 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
     }));
   },
 
-  updatePosition: (agentId: string, position: Position) => {
+  updateAgentPosition: (agentId: string, position: Position) => {
     set((state) => ({
       agents: {
         ...state.agents,
@@ -239,32 +245,27 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
   },
 
   // State transitions
-  startWorking: (agentId: string) => {
+  updateAgentState: (agentId: string, state: AgentState) => {
     set((state) => ({
       agents: {
         ...state.agents,
         [agentId]: {
           ...state.agents[agentId],
-          state: AgentState.WORKING
+          state
         }
       }
     }));
   },
 
-  startReturning: (agentId: string) => {
-    set((state) => ({
-      agents: {
-        ...state.agents,
-        [agentId]: {
-          ...state.agents[agentId],
-          state: AgentState.RETURNING
-        }
-      }
-    }));
+  // Selection
+  selectAgent: (agentId: string | null) => {
+    set({ selectedAgentId: agentId });
   },
+
+  // Utilities
 
   // UI state
-  setBubble: (agentId: string, bubble: Agent['bubble']) => {
+  setAgentBubble: (agentId: string, bubble: Agent['bubble']) => {
     set((state) => ({
       agents: {
         ...state.agents,
@@ -286,6 +287,11 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
         }
       }
     }));
+  },
+
+  // Selection
+  selectAgent: (agentId: string | null) => {
+    set({ selectedAgentId: agentId });
   },
 
   // Utilities

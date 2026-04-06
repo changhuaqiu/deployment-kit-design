@@ -22,8 +22,10 @@ describe('Agent Store', () => {
     store.getState().assignTask(agent.id, {
       id: 'task-1',
       type: 'scan',
+      skill: 'aws-scan',
       targetDistrict: 'test-compute',
-      status: 'pending'
+      status: 'pending',
+      progress: 0
     });
 
     expect(store.getState().agents[agent.id].state).toBe('walking');
