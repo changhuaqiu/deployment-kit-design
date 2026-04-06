@@ -80,9 +80,9 @@ export function MapCanvas({
     const mouseX = clientX - rect.left
     const mouseY = clientY - rect.top
 
-    // Convert to map coordinates
-    const mapX = (mouseX + viewport.x) / zoomScale
-    const mapY = (mouseY + viewport.y) / zoomScale
+    // Convert to map coordinates - FIXED: use correct formula
+    const mapX = mouseX / zoomScale + viewport.x
+    const mapY = mouseY / zoomScale + viewport.y
 
     // Hit detection for buildings
     for (const building of buildings) {
@@ -522,7 +522,7 @@ export function MapCanvas({
       const parent = canvas.parentElement
       if (!parent) return
 
-      const width = parent.clientWidth * 0.75
+      const width = parent.clientWidth
       const height = parent.clientHeight
 
       canvas.width = width
