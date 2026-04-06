@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ViewSwitcher } from './ViewSwitcher'
 import AgentRenderer from './AgentRenderer'
-import { DistrictRenderer } from './DistrictRenderer'
+import { DistrictsContainer } from './DistrictsContainer'
 import { useAgentStore } from '@/store/agents'
 import { useDistrictStore } from '@/store/districts'
 import { ViewDimension, DistrictType, AgentRole } from '@/types/agents'
@@ -101,7 +101,7 @@ export function CityMap() {
         style={{ width: mapWidth, height: mapHeight }}
       >
         {/* Render Districts */}
-        <DistrictRenderer
+        <DistrictsContainer
           districts={filteredDistricts}
           width={mapWidth}
           height={mapHeight}
