@@ -132,8 +132,12 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
 
     if (!agent) return;
 
-    // Update agent with task and change state to walking
+    // Add task to tasks record
     set((state) => ({
+      tasks: {
+        ...state.tasks,
+        [task.id]: task
+      },
       agents: {
         ...state.agents,
         [agentId]: {
@@ -152,13 +156,20 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
 
     if (!agent || !agent.currentTask || agent.currentTask.id !== taskId) return;
 
+    // Create a new task with preserved properties and updated status
+    const completedTask: Task = {
+      ...agent.currentTask,
+      status: 'completed' as const,
+      progress: 100
+    };
+
     // Update task to completed and return agent to office
     set((state) => ({
       agents: {
         ...state.agents,
         [agentId]: {
           ...agent,
-          currentTask: { ...agent.currentTask, status: 'completed' },
+          currentTask: completedTask,
           state: AgentState.RETURNING,
           progress: 100
         }
@@ -172,13 +183,20 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
 
     if (!agent || !agent.currentTask || agent.currentTask.id !== taskId) return;
 
+    // Create a new task with preserved properties and updated status
+    const failedTask: Task = {
+      ...agent.currentTask,
+      status: 'failed' as const,
+      progress: 0
+    };
+
     // Update task to failed and return agent to office
     set((state) => ({
       agents: {
         ...state.agents,
         [agentId]: {
           ...agent,
-          currentTask: { ...agent.currentTask, status: 'failed' },
+          currentTask: failedTask,
           state: AgentState.RETURNING,
           progress: 0
         }
@@ -245,13 +263,13 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
   },
 
   // State transitions
-  updateAgentState: (agentId: string, state: AgentState) => {
+  updateAgentState: (agentId: string, newState: AgentState) => {
     set((state) => ({
       agents: {
         ...state.agents,
         [agentId]: {
           ...state.agents[agentId],
-          state
+          state: newState
         }
       }
     }));
@@ -287,11 +305,6 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
         }
       }
     }));
-  },
-
-  // Selection
-  selectAgent: (agentId: string | null) => {
-    set({ selectedAgentId: agentId });
   },
 
   // Utilities
