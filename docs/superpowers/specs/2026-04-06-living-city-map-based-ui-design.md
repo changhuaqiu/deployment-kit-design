@@ -732,6 +732,255 @@ These features are **NOT** part of this design:
 
 **Rationale:** Focus on core interactive map experience. These can be future enhancements if needed.
 
+## OpenCode Integration
+
+### Overview
+
+The Living City map interface integrates with **OpenCode** ([opencode.ai](https://opencode.ai)) as the primary data source for agents and deployment tasks. OpenCode is an AI-powered development platform that provides intelligent agents for infrastructure operations.
+
+### Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ OpenCode Platform (opencode.ai)                             │
+│ ├── Agent Registry (Scanner, Generator, Reviewer agents)    │
+│ ├── Task Queue (Pending and running tasks)                  │
+│ └── Deployment State (Changes, Runs, Resources)             │
+└─────────────────────────────────────────────────────────────┘
+                         ↓ API Calls
+┌─────────────────────────────────────────────────────────────┐
+│ Frontend: Living City Map                                   │
+│ ├── MapCanvas (Visualizes agents on map)                    │
+│ ├── AgentOfficePanel (Shows agent status from OpenCode)     │
+│ └── Task Dispatch (Sends tasks to OpenCode agents)          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Current Integration (Mock)
+
+**File:** `src/store/deployStore.ts`
+
+The current implementation includes a mock OpenCode API:
+
+```typescript
+export const mockOpenCodeApi = {
+  fetchAgentsForTask: async (taskType: 'scan' | 'generate') => {
+    // Simulates fetching agents from OpenCode
+    // Returns array of agents with id, name, task, duration
+  }
+}
+```
+
+**Agent Data Structure:**
+```typescript
+interface WorkerAgent {
+  id: string          // OpenCode agent ID
+  role: AgentRole     // 'scanner' | 'generator' | 'reviewer'
+  name: string        // OpenCode agent name (e.g., "OpenCode-VPCScanner")
+  icon: string        // Emoji icon for display
+  status: AgentStatus // 'idle' | 'working' | 'thinking' | 'blocked' | 'done'
+  currentTask: string // Current task description
+}
+```
+
+### Integration Points
+
+#### 1. Agent Office Panel Data
+
+**Current:** Agent cards use mock data from `deployStore`
+
+**Target:** All agent data comes from OpenCode API
+
+**Implementation:**
+- `AgentOfficePanel` reads from `useDeployStore` agents array
+- `useDeployStore` fetches from `mockOpenCodeApi` (currently)
+- Future: Replace mock with real OpenCode API calls
+
+**Data Mapping:**
+| OpenCode Response | Map Display |
+|-------------------|-------------|
+| `OpenCode-VPCScanner` | 🕵️ VPC Scanner |
+| `OpenCode-DBScanner` | 🕵️ DB Scanner |
+| `OpenCode-TerraformWriter` | 👨‍🎨 Terraform Writer |
+| `OpenCode-SecurityChecker` | 👮 Security Checker |
+
+#### 2. Task Dispatch
+
+**Current:** `dispatchAgents()` in `useDeployStore` spawns mock agents
+
+**Target:** Send tasks to OpenCode agents, receive status updates
+
+**Flow:**
+```
+User clicks "Dispatch" in AgentOfficePanel
+  ↓
+useDeployStore.dispatchAgents()
+  ↓
+mockOpenCodeApi.fetchAgentsForTask(taskType)
+  ↓
+Spawn agents with OpenCode IDs
+  ↓
+Show agents moving on map (AgentRenderer)
+  ↓
+Agent completes task → Update OpenCode state
+```
+
+#### 3. Deployment State
+
+**Current:** Changes, runs, and resources stored in `localStorage`
+
+**Target:** Sync with OpenCode deployment state
+
+**Data Types:**
+- `DeployChange`: Deployment changes (from OpenCode)
+- `DeployRun`: Deployment runs (from OpenCode)
+- `ResourceChange`: Resource changes (from OpenCode)
+- `InventoryItem`: Scanned resources (from OpenCode)
+
+### API Integration Strategy
+
+#### Phase 1: Mock API (Current)
+
+**Status:** ✅ Implemented
+
+**Description:** Use `mockOpenCodeApi` to simulate OpenCode responses
+
+**Advantages:**
+- No external dependencies
+- Fast development
+- Deterministic for testing
+
+#### Phase 2: Real OpenCode API (Future)
+
+**Implementation:**
+
+1. **Create OpenCode Client**
+
+```typescript
+// src/lib/opencodeClient.ts
+export class OpenCodeClient {
+  private baseUrl: string
+  private apiKey: string
+
+  constructor(config: { baseUrl: string; apiKey: string }) {
+    this.baseUrl = config.baseUrl
+    this.apiKey = config.apiKey
+  }
+
+  async fetchAgents(taskType: 'scan' | 'generate'): Promise<WorkerAgent[]> {
+    const response = await fetch(`${this.baseUrl}/api/v1/agents`, {
+      headers: { 'Authorization': `Bearer ${this.apiKey}` },
+      body: JSON.stringify({ taskType })
+    })
+    return response.json()
+  }
+
+  async dispatchTask(agentId: string, task: Task): Promise<void> {
+    await fetch(`${this.baseUrl}/api/v1/tasks`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ agentId, task })
+    })
+  }
+
+  async getDeploymentState(): Promise<DeploymentState> {
+    const response = await fetch(`${this.baseUrl}/api/v1/deployments`, {
+      headers: { 'Authorization': `Bearer ${this.apiKey}` }
+    })
+    return response.json()
+  }
+}
+```
+
+2. **Update Store to Use Real API**
+
+```typescript
+// src/store/deployStore.ts
+const opencodeClient = new OpenCodeClient({
+  baseUrl: import.meta.env.VITE_OPENCODE_BASE_URL,
+  apiKey: import.meta.env.VITE_OPENCODE_API_KEY
+})
+
+// Replace mockOpenCodeApi.fetchAgentsForTask with
+// opencodeClient.fetchAgents()
+```
+
+3. **Environment Configuration**
+
+```bash
+# .env.development
+VITE_OPENCODE_BASE_URL=http://localhost:3000
+VITE_OPENCODE_API_KEY=dev-key
+
+# .env.production
+VITE_OPENCODE_BASE_URL=https://api.opencode.ai
+VITE_OPENCODE_API_KEY=${OPENCODE_API_KEY}
+```
+
+### Error Handling
+
+**API Failure Fallback:**
+
+```typescript
+async function fetchAgentsWithFallback(taskType: 'scan' | 'generate') {
+  try {
+    // Try real OpenCode API
+    return await opencodeClient.fetchAgents(taskType)
+  } catch (error) {
+    console.warn('OpenCode API unavailable, using mock agents')
+    // Fallback to mock data
+    return await mockOpenCodeApi.fetchAgentsForTask(taskType)
+  }
+}
+```
+
+**User Feedback:**
+- Show toast notification when using fallback mode
+- Display connection status indicator in UI
+- Allow manual refresh to retry API connection
+
+### Security Considerations
+
+1. **API Key Storage**
+   - Never commit API keys to git
+   - Use environment variables
+   - Rotate keys regularly
+
+2. **CORS Configuration**
+   - OpenCode API must allow CORS from frontend domain
+   - Configure in OpenCode settings
+
+3. **Rate Limiting**
+   - Respect OpenCode API rate limits
+   - Implement exponential backoff for retries
+   - Cache agent lists where appropriate
+
+### Testing Strategy
+
+**Unit Tests:**
+- Mock OpenCode API responses
+- Test store actions with mock data
+- Test error handling (API failures)
+
+**Integration Tests:**
+- Test full flow with mock OpenCode server
+- Verify agent dispatch → movement → completion
+
+**E2E Tests:**
+- Test with real OpenCode sandbox environment
+- Verify data sync between frontend and OpenCode
+
+### Non-Goals (Out of Scope)
+
+- ❌ Real-time WebSocket updates (use polling instead)
+- ❌ OpenCode authentication flow (assume pre-configured API key)
+- ❌ Custom OpenCode agent registration (use existing agents)
+
+---
+
 ## Open Questions
 
 ### Q1: Should we animate agent transitions between zoom levels?
