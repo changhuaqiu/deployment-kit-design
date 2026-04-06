@@ -198,5 +198,8 @@ const createDistrictStore = () => create<DistrictStore>((set, get) => ({
   }
 }));
 
+// Create singleton instance
+export const useDistrictStore = createDistrictStore();
+
 export { createDistrictStore };
 export type { DistrictStore };

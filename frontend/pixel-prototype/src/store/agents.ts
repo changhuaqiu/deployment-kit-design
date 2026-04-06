@@ -321,5 +321,8 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
   }
 }));
 
+// Create singleton instance
+export const useAgentStore = createAgentStore();
+
 export { createAgentStore };
 export type { AgentStore };
