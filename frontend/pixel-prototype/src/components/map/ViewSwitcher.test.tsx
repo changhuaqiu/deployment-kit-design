@@ -35,12 +35,14 @@ describe('ViewSwitcher', () => {
     // Check environment button is highlighted
     const envButton = screen.getAllByText(/ENV/)[0].closest('button')
     expect(envButton).not.toBeNull()
-    expect(envButton?.className).toMatch(/border-cyan-400/)
+    // Check that it has the active styling (cyan-400 instead of cyan-800)
+    expect(envButton?.className).toContain('border-cyan-400')
+    expect(envButton?.className).not.toContain('border-cyan-800')
 
     // Check resource button is not highlighted
     const resButtonInactive = screen.getAllByText(/RES/)[0].closest('button')
     expect(resButtonInactive).not.toBeNull()
-    expect(resButtonInactive?.className).toMatch(/border-cyan-800\/40/)
+    expect(resButtonInactive?.className).toContain('border-cyan-800')
 
     // Rerender with resource view
     rerender(

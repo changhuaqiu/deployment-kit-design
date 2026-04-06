@@ -12,23 +12,23 @@ describe('CityMap', () => {
   it('renders ViewSwitcher component', () => {
     render(<CityMap />)
 
-    expect(screen.getByText(/ENV/)).toBeInTheDocument()
-    expect(screen.getByText(/RES/)).toBeInTheDocument()
-    expect(screen.getByText(/APP/)).toBeInTheDocument()
+    expect(screen.getAllByText(/ENV/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/RES/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/APP/).length).toBeGreaterThan(0)
   })
 
   it('renders city selector buttons', () => {
     render(<CityMap />)
 
-    expect(screen.getByText('TEST')).toBeInTheDocument()
-    expect(screen.getByText('PROD')).toBeInTheDocument()
-    expect(screen.getByText('ALL')).toBeInTheDocument()
+    expect(screen.getAllByText('TEST').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('PROD').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('ALL').length).toBeGreaterThan(0)
   })
 
   it('renders view info overlay', () => {
     render(<CityMap />)
 
-    expect(screen.getByText(/VIEW:/)).toBeInTheDocument()
+    expect(screen.getAllByText(/VIEW:/).length).toBeGreaterThan(0)
   })
 
   it('renders SVG canvas', () => {

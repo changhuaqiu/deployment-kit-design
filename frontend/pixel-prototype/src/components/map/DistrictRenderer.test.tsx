@@ -81,8 +81,8 @@ describe('DistrictRenderer', () => {
       issues: [
         {
           id: 'issue-1',
-          type: 'drift',
-          severity: 'high',
+          type: 'drift' as const,
+          severity: 'high' as const,
           message: 'Configuration drift detected'
         }
       ]
