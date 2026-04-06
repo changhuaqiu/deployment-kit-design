@@ -1,5 +1,5 @@
 import type { Building, Connection } from '@/types/map'
-import { drawBuildingWithAnimation } from './mapAnimations'
+import { drawBuildingWithAnimation, drawConnectionWithFlow } from './mapAnimations'
 
 export function districtsToBuildings(
   districts: Array<{
@@ -108,21 +108,17 @@ export function drawConnection(
   fromY: number,
   toX: number,
   toY: number,
-  type: Connection['type']
+  type: Connection['type'],
+  time: number
 ): void {
-  ctx.beginPath()
-  ctx.moveTo(fromX, fromY)
-  ctx.lineTo(toX, toY)
-
-  if (type === 'dependency') {
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)'
-    ctx.setLineDash([5, 5])
-  } else {
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.6)'
-    ctx.setLineDash([])
-  }
-
-  ctx.lineWidth = 2
-  ctx.stroke()
-  ctx.setLineDash([])
+  // Use the new flow animation function
+  drawConnectionWithFlow(
+    ctx,
+    { from: '', to: '', type }, // Connection metadata (from/to IDs not needed for rendering)
+    fromX,
+    fromY,
+    toX,
+    toY,
+    time
+  )
 }

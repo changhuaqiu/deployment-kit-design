@@ -130,3 +130,48 @@ export function animateZoomTransition(
 export function cancelCurrentAnimation(): void {
   currentAnimation = null
 }
+
+export function drawConnectionWithFlow(
+  ctx: CanvasRenderingContext2D,
+  connection: { from: string; to: string; type: 'dependency' | 'dataflow' },
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  time: number
+): void {
+  // Draw base connection line
+  ctx.beginPath()
+  ctx.strokeStyle = connection.type === 'dependency' ? '#6b7280' : '#3b82f6'
+  ctx.lineWidth = 2
+  ctx.moveTo(fromX, fromY)
+  ctx.lineTo(toX, toY)
+  ctx.stroke()
+
+  // Don't show particles at world zoom level
+  const zoomScale = 1.0  // Would be passed as parameter
+  if (zoomScale < 0.8) return
+
+  // Calculate particle position
+  const speed = connection.type === 'dataflow' ? 0.002 : 0.0005
+  const progress = (time * speed) % 1
+
+  const particleX = fromX + (toX - fromX) * progress
+  const particleY = fromY + (toY - fromY) * progress
+
+  // Draw particle
+  ctx.save()
+  ctx.beginPath()
+  ctx.fillStyle = connection.type === 'dataflow' ? '#3b82f6' : '#8b5cf6'
+  ctx.arc(particleX, particleY, 4, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Draw particle glow
+  ctx.beginPath()
+  ctx.fillStyle = connection.type === 'dataflow'
+    ? 'rgba(59, 130, 246, 0.3)'
+    : 'rgba(139, 92, 246, 0.3)'
+  ctx.arc(particleX, particleY, 8, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+}
