@@ -1,7 +1,74 @@
 import type { ViewportState, ZoomLevel } from '@/types/map'
+import type { Building } from '@/types/map'
 
 export interface ViewportStateWithZoom extends ViewportState {
   zoom: ZoomLevel
+}
+
+export interface BuildingAnimation {
+  type: 'pulse' | 'blink'
+  color: string
+  alpha: number
+}
+
+export function getBuildingAnimation(
+  status: Building['status'],
+  time: number
+): BuildingAnimation {
+  switch (status) {
+    case 'healthy':
+      return {
+        type: 'pulse',
+        color: '#10b981',
+        alpha: 0.3 + Math.sin(time / 300) * 0.15
+      }
+
+    case 'warning':
+      return {
+        type: 'blink',
+        color: '#f59e0b',
+        alpha: Math.sin(time / 500) > 0 ? 0.8 : 0.2
+      }
+
+    case 'error':
+      return {
+        type: 'blink',
+        color: '#ef4444',
+        alpha: Math.sin(time / 250) > 0 ? 1.0 : 0.3
+      }
+
+    default:
+      return { type: 'pulse', color: '#6b7280', alpha: 0 }
+  }
+}
+
+export function drawBuildingWithAnimation(
+  ctx: CanvasRenderingContext2D,
+  building: Building,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  time: number
+) {
+  const anim = getBuildingAnimation(building.status, time)
+
+  if (anim.type === 'pulse') {
+    ctx.save()
+    ctx.fillStyle = anim.color
+    ctx.globalAlpha = anim.alpha
+    ctx.fillRect(x, y, width, height)
+    ctx.restore()
+  }
+
+  if (anim.type === 'blink') {
+    ctx.save()
+    ctx.strokeStyle = anim.color
+    ctx.lineWidth = 3
+    ctx.globalAlpha = anim.alpha
+    ctx.strokeRect(x - 2, y - 2, width + 4, height + 4)
+    ctx.restore()
+  }
 }
 
 export function getNextZoomScale(zoom: ZoomLevel): number {

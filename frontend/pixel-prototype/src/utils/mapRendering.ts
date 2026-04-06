@@ -1,4 +1,5 @@
 import type { Building, Connection } from '@/types/map'
+import { drawBuildingWithAnimation } from './mapAnimations'
 
 export function districtsToBuildings(
   districts: Array<{
@@ -52,7 +53,8 @@ export function drawBuilding(
   y: number,
   width: number,
   height: number,
-  zoom: string
+  zoom: string,
+  time: number
 ): void {
   const statusColor = getBuildingColor(building.status)
   const cityColor = getCityColor(building.city)
@@ -80,6 +82,9 @@ export function drawBuilding(
   ctx.font = `${Math.max(10, width / 6)}px Arial`
   ctx.fillStyle = '#fff'
   ctx.fillText(building.name, x + width / 2, y + height - 8)
+
+  // Draw animation overlay
+  drawBuildingWithAnimation(ctx, building, x, y, width, height, time)
 }
 
 function getBuildingIcon(type: Building['type']): string {

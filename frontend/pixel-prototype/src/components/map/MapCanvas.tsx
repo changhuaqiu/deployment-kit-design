@@ -146,6 +146,9 @@ export function MapCanvas({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    // Get current time for animations
+    const time = Date.now()
+
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -227,7 +230,7 @@ export function MapCanvas({
         ctx.strokeRect(screenPos.x - 4, screenPos.y - 4, width + 8, height + 8)
       }
 
-      drawBuilding(ctx, building, screenPos.x, screenPos.y, width, height, zoom)
+      drawBuilding(ctx, building, screenPos.x, screenPos.y, width, height, zoom, time)
     })
 
     // Draw agent paths
