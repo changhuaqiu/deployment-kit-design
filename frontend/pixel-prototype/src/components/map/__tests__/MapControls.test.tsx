@@ -3,6 +3,12 @@ import { vi } from 'vitest'
 import { MapControls } from '../MapControls'
 import { useMapStore } from '@/store/mapStore'
 
+// Mock requestAnimationFrame for tests
+global.requestAnimationFrame = vi.fn((callback) => setTimeout(callback, 0))
+
+// Mock setTimeout to control animation timing
+vi.useFakeTimers()
+
 describe('MapControls', () => {
   beforeEach(() => {
     useMapStore.getState().resetView()
@@ -16,27 +22,51 @@ describe('MapControls', () => {
 
   it('zooms in when + button clicked', () => {
     const setZoom = vi.fn()
-    const originalSetZoom = useMapStore.getState().setZoom
+    const setViewport = vi.fn()
+    const resetView = vi.fn()
 
-    // Mock the setZoom function
-    useMapStore.setState({ setZoom })
+    // Set initial zoom to world so we can actually zoom in
+    useMapStore.setState({
+      zoom: 'world',
+      setZoom,
+      setViewport,
+      resetView
+    })
 
     render(<MapControls />)
 
     fireEvent.click(screen.getByRole('button', { name: /zoom in/i }))
+
+    // Advance timers to allow animation to complete
+    vi.advanceTimersByTime(2000)
+
+    // Now both functions should have been called
+    expect(setViewport).toHaveBeenCalled()
     expect(setZoom).toHaveBeenCalled()
   })
 
   it('zooms out when - button clicked', () => {
     const setZoom = vi.fn()
-    const originalSetZoom = useMapStore.getState().setZoom
+    const setViewport = vi.fn()
+    const resetView = vi.fn()
 
-    // Mock the setZoom function
-    useMapStore.setState({ setZoom })
+    // Set initial zoom to environment so we can actually zoom out
+    useMapStore.setState({
+      zoom: 'environment',
+      setZoom,
+      setViewport,
+      resetView
+    })
 
     render(<MapControls />)
 
     fireEvent.click(screen.getByRole('button', { name: /zoom out/i }))
+
+    // Advance timers to allow animation to complete
+    vi.advanceTimersByTime(2000)
+
+    // Now both functions should have been called
+    expect(setViewport).toHaveBeenCalled()
     expect(setZoom).toHaveBeenCalled()
   })
 
