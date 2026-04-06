@@ -418,15 +418,16 @@ export function MapCanvas({
       if (dragStateRef.current.isDraggingBuilding && dragStateRef.current.draggedBuildingId) {
         const newBuildingX = dragStateRef.current.buildingStartX + dx / zoomScale
         const newBuildingY = dragStateRef.current.buildingStartY + dy / zoomScale
-        console.log('🚚 Moving building to:', newBuildingX, newBuildingY)
+        console.log('🚚 Moving building', dragStateRef.current.draggedBuildingId, 'to:', newBuildingX, newBuildingY)
         onBuildingPositionChange?.(dragStateRef.current.draggedBuildingId, newBuildingX, newBuildingY)
-        return
+        return // Important: don't drag viewport when dragging building
       }
 
-      // Handle viewport dragging
+      // Handle viewport dragging (only if not dragging building)
       const newViewportX = dragStateRef.current.viewportStartX - dx / zoomScale
       const newViewportY = dragStateRef.current.viewportStartY - dy / zoomScale
 
+      console.log('🌍 Moving viewport to:', newViewportX, newViewportY)
       onViewportChange({ x: newViewportX, y: newViewportY })
     },
     [zoomScale, onViewportChange, hovered, onHoverChange, onMousePositionChange, onBuildingPositionChange]
