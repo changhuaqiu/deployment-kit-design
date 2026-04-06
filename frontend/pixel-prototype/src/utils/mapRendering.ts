@@ -72,16 +72,23 @@ export function drawBuilding(
   ctx.fillStyle = cityColor
   ctx.fillRect(x + 4, y + 4, 8, 8)
 
-  // Draw icon
+  // Draw icon (bigger, more prominent)
   const icon = getBuildingIcon(building.type)
-  ctx.font = `${Math.max(16, width / 4)}px Arial`
+  const iconSize = Math.max(32, width / 2) // Much bigger icon
+  ctx.font = `${iconSize}px "Press Start 2P", "Courier New", monospace` // Pixel font
   ctx.textAlign = 'center'
-  ctx.fillText(icon, x + width / 2, y + height / 2)
+  ctx.textBaseline = 'middle'
+  ctx.fillText(icon, x + width / 2, y + height / 2 - 5) // Slightly above center
 
-  // Draw name
-  ctx.font = `${Math.max(10, width / 6)}px Arial`
-  ctx.fillStyle = '#fff'
-  ctx.fillText(building.name, x + width / 2, y + height - 8)
+  // Draw name (smaller text below icon)
+  const textSize = Math.max(8, width / 10) // Smaller text
+  ctx.font = `${textSize}px "Press Start 2P", "Courier New", monospace`
+  ctx.fillStyle = '#94a3b8' // Lighter gray for less prominence
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'bottom'
+  // Truncate name if too long
+  const displayName = building.name.length > 12 ? building.name.substring(0, 10) + '..' : building.name
+  ctx.fillText(displayName, x + width / 2, y + height - 6)
 
   // Draw animation overlay
   drawBuildingWithAnimation(ctx, building, x, y, width, height, time)
