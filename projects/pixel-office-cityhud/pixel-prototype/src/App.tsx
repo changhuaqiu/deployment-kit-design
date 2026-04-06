@@ -5,7 +5,7 @@ import Workshop from "@/pages/Workshop";
 import Districts from "@/pages/Districts";
 import Change from "@/pages/Change";
 import Run from "@/pages/Run";
-import { CityMapStep2 } from "@/components/map/CityMapStep2";
+import { CityMapComplete } from "@/components/map/CityMapComplete";
 
 export default function App() {
   return (
@@ -13,7 +13,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/map" element={<Map />} />
-        <Route path="/map/:env" element={<CityMapStep2 />} />
+        <Route path="/map/:env" element={<CityMapComplete />} />
         <Route path="/districts/:env" element={<Districts />} />
         <Route path="/workshop/:id" element={<Workshop />} />
         <Route path="/changes/:id" element={<Change />} />

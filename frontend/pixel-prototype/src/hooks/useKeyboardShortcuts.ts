@@ -14,7 +14,6 @@ const KEYBOARD_SHORTCUTS: Record<string, KeyboardAction> = {
   'ArrowLeft': 'panLeft',
   'ArrowRight': 'panRight',
   'Escape': 'clearSelection',
-  'Enter': 'openDetail',
   '1': 'presetTestCity',
   '2': 'presetProdCity',
   '3': 'presetAllCities',
@@ -23,7 +22,7 @@ const KEYBOARD_SHORTCUTS: Record<string, KeyboardAction> = {
 type KeyboardAction =
   | 'zoomIn' | 'zoomOut' | 'resetView'
   | 'panUp' | 'panDown' | 'panLeft' | 'panRight'
-  | 'clearSelection' | 'openDetail'
+  | 'clearSelection'
   | 'presetTestCity' | 'presetProdCity' | 'presetAllCities'
 
 export function useKeyboardShortcuts(
@@ -90,5 +89,5 @@ export function useKeyboardShortcuts(
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [viewport, zoom, selection, setViewport, setZoom, setSelection, resetView])
+  }, [viewport, zoom, selection])
 }

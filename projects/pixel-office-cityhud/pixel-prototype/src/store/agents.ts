@@ -10,6 +10,27 @@ import {
   DistrictType
 } from '@/types/agents';
 
+// NEW: WorkerAgent interface for map coordinate system
+export interface WorkerAgent {
+  id: string
+  role: AgentRole
+  name: string
+  icon: string
+  status: AgentState
+  currentTask: string | null
+
+  // NEW: Map-based position
+  position?: {
+    mapX: number
+    mapY: number
+  }
+  target?: {
+    mapX: number
+    mapY: number
+    buildingId?: string
+  }
+}
+
 interface AgentStore {
   // State
   agents: Record<string, Agent>;

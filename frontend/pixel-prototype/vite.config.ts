@@ -1,16 +1,27 @@
+import { realpathSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from "vite-tsconfig-paths";
 import { traeBadgePlugin } from 'vite-plugin-trae-solo-badge';
+
+const projectRoot = fileURLToPath(new URL('./', import.meta.url))
+const realProjectRoot = realpathSync(projectRoot)
 
 // https://vite.dev/config/
 export default defineConfig({
   build: {
     sourcemap: 'hidden',
   },
+  server: {
+    fs: {
+      allow: [projectRoot, realProjectRoot],
+    },
+  },
   test: {
     environment: 'jsdom',
-    setupFiles: ['./vitest.setup.ts'],
+    setupFiles: [fileURLToPath(new URL('./vitest.setup.ts', import.meta.url))],
+    globals: true,
   },
   plugins: [
     react({

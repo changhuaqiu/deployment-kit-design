@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { MapCanvas } from './MapCanvas'
 import { MapControls } from './MapControls'
+import { BuildingDetailPanel } from './BuildingDetailPanel'
+import { Tooltip } from './Tooltip'
 import AgentOfficePanel from '../city/AgentOfficePanel'
 import { DistrictType, AgentRole } from '@/types/agents'
 import { useAgentStore } from '@/store/agents'
 import { useDistrictStore } from '@/store/districts'
 import { useMapStore } from '@/store/mapStore'
+import { useDeployStore } from '@/store/deployStore'
 import { districtsToBuildings } from '@/utils/mapRendering'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import type { WorkerAgent } from '@/store/agents'
 
 /**
  * Clean City Map - No supervisors, just district areas
@@ -16,15 +21,22 @@ export function CityMapComplete() {
   const agents = useAgentStore((state) => state.agents)
   const createDistrict = useDistrictStore((state) => state.createDistrict)
   const createAgent = useAgentStore((state) => state.createAgent)
+  const workerAgents = useDeployStore((state) => state.agents)
 
   const viewport = useMapStore((state) => state.viewport)
   const zoom = useMapStore((state) => state.zoom)
   const selection = useMapStore((state) => state.selection)
+  const hovered = useMapStore((state) => state.hovered)
   const setViewport = useMapStore((state) => state.setViewport)
   const setZoom = useMapStore((state) => state.setZoom)
   const setSelection = useMapStore((state) => state.setSelection)
+  const setHovered = useMapStore((state) => state.setHovered)
 
   const [buildings, setBuildings] = useState<ReturnType<typeof districtsToBuildings>>([])
+const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+
+  // Initialize keyboard shortcuts
+  useKeyboardShortcuts(viewport, zoom, selection)
 
   // Initialize all districts for test and prod
   useEffect(() => {
@@ -67,6 +79,10 @@ export function CityMapComplete() {
     setSelection({ type: 'agent', id: agentId })
   }
 
+  const handleHoverChange = (hoveredState: { type: 'building' | 'agent' | null; id: string | null }) => {
+    setHovered(hoveredState)
+  }
+
   return (
     <div style={{
       width: '100vw',
@@ -84,15 +100,39 @@ export function CityMapComplete() {
         <MapCanvas
           buildings={buildings}
           agents={agentList}
+          workerAgents={workerAgents}
           connections={connections}
           viewport={viewport}
           zoom={zoom}
           selection={selection}
+          hovered={hovered}
           onBuildingClick={handleBuildingClick}
           onAgentClick={handleAgentClick}
           onViewportChange={setViewport}
           onZoomChange={setZoom}
+          onHoverChange={handleHoverChange}
+          onMousePositionChange={setMousePosition}
         />
+
+      {/* Tooltip */}
+      {hovered.type && hovered.id && (
+        <Tooltip
+          type={hovered.type}
+          target={hovered.type === 'building'
+            ? buildings.find(b => b.id === hovered.id)
+            : agents.find(a => a.id === hovered.id)
+          }
+          position={mousePosition}
+        />
+      )}
+
+      {/* BuildingDetailPanel */}
+      {selection.type === 'building' && selection.id && (
+        <BuildingDetailPanel
+          buildingId={selection.id}
+          onClose={() => setSelection({ type: null, id: null })}
+        />
+      )}
 
       {/* NEW: MapControls overlay */}
       <MapControls buildings={buildings} />

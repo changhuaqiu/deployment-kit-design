@@ -3,11 +3,15 @@ import type { Building, Connection, ZoomLevel, SelectionState, ViewportState, Ho
 import { getZoomScale } from '@/types/map'
 import { mapToScreen, screenToMap, pointInRect } from '@/utils/mapCoordinates'
 import { drawBuilding, drawConnection } from '@/utils/mapRendering'
+import { calculateAgentPath } from '@/utils/agentPathfinding'
 import type { Agent } from '@/types/agents'
+import type { WorkerAgent } from '@/store/agents'
+import { AgentRenderer } from './AgentRenderer'
 
 interface MapCanvasProps {
   buildings: Building[]
   agents: Agent[]
+  workerAgents: WorkerAgent[]
   connections: Connection[]
   viewport: ViewportState
   zoom: ZoomLevel
@@ -18,11 +22,13 @@ interface MapCanvasProps {
   onViewportChange: (updates: Partial<ViewportState>) => void
   onZoomChange: (zoom: ZoomLevel) => void
   onHoverChange: (hovered: HoverState) => void
+  onMousePositionChange?: (position: { x: number; y: number }) => void
 }
 
 export function MapCanvas({
   buildings,
   agents,
+  workerAgents,
   connections,
   viewport,
   zoom,
@@ -88,6 +94,50 @@ export function MapCanvas({
     return { type: null, id: null }
   }
 
+  // Render agent paths
+  const renderAgentPaths = (ctx: CanvasRenderingContext2D) => {
+    agents.forEach((agent) => {
+      // Only draw paths for agents with target and walking status
+      if (!agent.target || agent.state !== 'walking') return
+
+      // Find the target building
+      const targetBuilding = buildings.find((b) => b.id === agent.target?.buildingId)
+      if (!targetBuilding) return
+
+      // Calculate path
+      const path = calculateAgentPath(
+        { position: { mapX: agent.position.x, mapY: agent.position.y } },
+        targetBuilding,
+        buildings
+      )
+
+      if (path.length < 2) return
+
+      // Draw path line
+      ctx.beginPath()
+      ctx.strokeStyle = '#8b5cf6'
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 5])
+
+      path.forEach((point, index) => {
+        const screen = mapToScreen(point.x, point.y, viewport, zoomScale)
+        if (index === 0) ctx.moveTo(screen.x, screen.y)
+        else ctx.lineTo(screen.x, screen.y)
+      })
+
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // Draw end marker
+      const lastPoint = path[path.length - 1]
+      const endScreen = mapToScreen(lastPoint.x, lastPoint.y, viewport, zoomScale)
+      ctx.beginPath()
+      ctx.fillStyle = '#8b5cf6'
+      ctx.arc(endScreen.x, endScreen.y, 4, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
   // Render function
   const render = useCallback(() => {
     const canvas = canvasRef.current
@@ -95,6 +145,9 @@ export function MapCanvas({
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+
+    // Get current time for animations
+    const time = Date.now()
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -137,7 +190,7 @@ export function MapCanvas({
           zoomScale
         )
 
-        drawConnection(ctx, fromScreen.x, fromScreen.y, toScreen.x, toScreen.y, connection.type)
+        drawConnection(ctx, fromScreen.x, fromScreen.y, toScreen.x, toScreen.y, connection.type, time, zoomScale)
       }
     })
 
@@ -177,8 +230,11 @@ export function MapCanvas({
         ctx.strokeRect(screenPos.x - 4, screenPos.y - 4, width + 8, height + 8)
       }
 
-      drawBuilding(ctx, building, screenPos.x, screenPos.y, width, height, zoom)
+      drawBuilding(ctx, building, screenPos.x, screenPos.y, width, height, zoom, time)
     })
+
+    // Draw agent paths
+    renderAgentPaths(ctx)
 
     // Draw agents
     agents.forEach((agent) => {
@@ -239,7 +295,7 @@ export function MapCanvas({
         ctx.fillText(agent.bubble.message, bubbleX + 8, bubbleY + 8)
       }
     })
-  }, [buildings, agents, connections, viewport, zoom, zoomScale, selection])
+  }, [buildings, agents, connections, viewport, zoom, zoomScale, selection, hovered])
 
   // Animation loop
   useEffect(() => {
@@ -412,19 +468,32 @@ export function MapCanvas({
   }, [])
 
   return (
-    <canvas
-      ref={canvasRef}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
-      onWheel={handleWheel}
-      style={{
-        display: 'block',
-        width: '100%',
-        height: '100%',
-        cursor: hovered.type ? 'pointer' : 'default'
-      }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <canvas
+        ref={canvasRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        onWheel={handleWheel}
+        style={{
+          display: 'block',
+          width: '100%',
+          height: '100%',
+          cursor: hovered.type ? 'pointer' : 'default'
+        }}
+      />
+
+      {/* Render agents as DOM overlays */}
+      {workerAgents.map(agent => (
+        <AgentRenderer
+          key={agent.id}
+          agent={agent}
+          viewport={viewport}
+          zoom={zoom}
+          onClick={onAgentClick}
+        />
+      ))}
+    </div>
   )
 }

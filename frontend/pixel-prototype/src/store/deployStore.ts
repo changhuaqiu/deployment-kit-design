@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { projectionForGenerate, projectionForScan, type ProjectionEvent } from '@/utils/projection'
+import { projectionForGenerate, projectionForScan, type ProjectionEvent } from '../utils/projection'
+import type { DeployKitEvent } from '../runtime/deploykit/types'
 
 export type AgentStatus = 'idle' | 'working' | 'thinking' | 'blocked' | 'done'
 export type AgentRole = 'scanner' | 'generator' | 'reviewer'
@@ -89,6 +90,16 @@ export type WorkshopState = {
   inventory: InventoryItem[]
   artifact: IaCArtifact | null
   updatedAt: number
+}
+
+export type ActiveWorkflowState = {
+  sessionId: string
+  workflowId: string
+  workflowName: string
+  totalSkills: number
+  currentSkillId: string | null
+  currentSkillName: string | null
+  status: 'idle' | 'running' | 'waiting_approval' | 'succeeded' | 'failed'
 }
 
 export type ChangePlacement = {
@@ -353,6 +364,7 @@ export const DEMO_USER = { email: 'operator@demo.local' }
 type DeployState = {
   envFocus: EnvName
   selectedChangeId: string | null
+  activeWorkflow: ActiveWorkflowState | null
   changes: DeployChange[]
   runs: DeployRun[]
   agents: WorkerAgent[]
@@ -395,6 +407,7 @@ type DeployState = {
   tickRun: (runId: string) => void
   triggerRollback: (runId: string) => void
   completeRollback: (runId: string) => void
+  ingestDeployKitEvent: (event: DeployKitEvent) => void
 }
 
 const initialChanges = loadJson<DeployChange[]>('px_changes') ?? seedChanges()
@@ -424,6 +437,7 @@ export const mockOpenCodeApi = {
 export const useDeployStore = create<DeployState>((set, get) => ({
   envFocus: 'prod',
   selectedChangeId: null,
+  activeWorkflow: null,
   changes: initialChanges,
   runs: initialRuns,
   agents: [
@@ -547,7 +561,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
       const runs: DeployRun[] = []
       saveJson('px_changes', changes)
       saveJson('px_runs', runs)
-      return { ...s, selectedChangeId: null, changes, runs }
+      return { ...s, selectedChangeId: null, activeWorkflow: null, changes, runs }
     }),
 
   createTask: ({ title, env, scenario, createdBy, scope, repo }) => {
@@ -892,6 +906,70 @@ export const useDeployStore = create<DeployState>((set, get) => ({
       saveJson('px_runs', runs)
       saveJson('px_changes', changes)
       return { ...s, runs, changes }
+    }),
+
+  ingestDeployKitEvent: (event) =>
+    set((s) => {
+      if (event.kind === 'workflow_selected') {
+        return {
+          activeWorkflow: {
+            sessionId: event.sessionId,
+            workflowId: event.workflowId,
+            workflowName: event.workflowName,
+            totalSkills: event.totalSkills,
+            currentSkillId: null,
+            currentSkillName: null,
+            status: 'idle',
+          },
+        }
+      }
+
+      if (!s.activeWorkflow || s.activeWorkflow.workflowId !== event.workflowId) {
+        return {}
+      }
+
+      if (event.kind === 'skill_started') {
+        return {
+          activeWorkflow: {
+            ...s.activeWorkflow,
+            currentSkillId: event.skillId,
+            currentSkillName: event.skillName,
+            status: 'running',
+          },
+        }
+      }
+
+      if (event.kind === 'skill_completed') {
+        return {
+          activeWorkflow: {
+            ...s.activeWorkflow,
+            currentSkillId: event.skillId,
+            status: 'running',
+          },
+        }
+      }
+
+      if (event.kind === 'approval_required') {
+        return {
+          activeWorkflow: {
+            ...s.activeWorkflow,
+            status: 'waiting_approval',
+          },
+        }
+      }
+
+      if (event.kind === 'workflow_completed') {
+        return {
+          activeWorkflow: {
+            ...s.activeWorkflow,
+            currentSkillId: null,
+            currentSkillName: null,
+            status: event.status === 'success' ? 'succeeded' : 'failed',
+          },
+        }
+      }
+
+      return {}
     }),
 }))
 

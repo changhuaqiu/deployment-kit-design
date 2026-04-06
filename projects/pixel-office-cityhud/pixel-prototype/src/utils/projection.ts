@@ -1,6 +1,6 @@
-import type { DeployChange, EnvName, InventoryItem, ResourceChange } from '@/store/deployStore'
-import { districtForInventory, districtForResource, type DistrictKey } from '@/utils/city'
-import { defaultDistrictRects, placeInDistrict } from '@/utils/cityPlacement'
+import type { DeployChange, EnvName, InventoryItem, ResourceChange } from '../store/deployStore'
+import { districtForInventory, districtForResource, type DistrictKey } from './city'
+import { defaultDistrictRects, placeInDistrict } from './cityPlacement'
 
 export type ProjectionKind = 'scan_ping' | 'build_start' | 'build_complete' | 'drift_alert'
 

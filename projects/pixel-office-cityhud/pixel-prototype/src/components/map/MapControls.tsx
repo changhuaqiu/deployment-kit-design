@@ -143,26 +143,45 @@ export function MapControls({ buildings = [] }: MapControlsProps) {
         bottom: 10,
         left: 10,
         display: 'flex',
+        flexDirection: 'column',
         gap: '8px',
-        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-        padding: '12px',
-        borderRadius: '8px',
-        border: '1px solid #8b5cf6'
       }}>
-        <button onClick={() => handlePreset('test')} style={{
-          padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
-          backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px'
-        }}>Test</button>
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          padding: '12px',
+          borderRadius: '8px',
+          border: '1px solid #8b5cf6'
+        }}>
+          <button onClick={() => handlePreset('test')} style={{
+            padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
+            backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px'
+          }}>Test</button>
 
-        <button onClick={() => handlePreset('prod')} style={{
-          padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
-          backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px'
-        }}>Prod</button>
+          <button onClick={() => handlePreset('prod')} style={{
+            padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
+            backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px'
+          }}>Prod</button>
 
-        <button onClick={() => handlePreset('all')} style={{
-          padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
-          backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px'
-        }}>All</button>
+          <button onClick={() => handlePreset('all')} style={{
+            padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
+            backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px'
+          }}>All</button>
+        </div>
+
+        <div style={{
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          border: '1px solid #8b5cf6',
+          color: '#9ca3af',
+          fontSize: '11px',
+          fontFamily: 'monospace',
+          whiteSpace: 'nowrap'
+        }}>
+          Shortcuts: +/- zoom | Arrows pan | Esc clear | 1/2/3 presets
+        </div>
       </div>
     </>
   )
