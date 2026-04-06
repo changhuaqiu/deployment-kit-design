@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CityBuilder 3D - IaC体素城市</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden;
+            background: #87CEEB;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #three-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 像素风UI */
+        .pixel-ui {
+            position: absolute;
+            z-index: 100;
+            font-family: 'Press Start 2P', cursive;
+            pointer-events: none;
+        }
+
+        .pixel-ui > * {
+            pointer-events: auto;
+        }
+
+        /* 顶部状态栏 */
+        .top-bar {
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(44, 62, 80, 0.95);
+            border: 4px solid #34495e;
+            padding: 15px 25px;
+            display: flex;
+            gap: 30px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 10px;
+            color: #ecf0f1;
+        }
+
+        .stat-icon {
+            font-size: 18px;
+        }
+
+        .stat-value {
+            color: #f39c12;
+        }
+
+        /* 右侧工具栏 */
+        .tools-panel {
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(44, 62, 80, 0.95);
+            border: 4px solid #34495e;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            color: #f39c12;
+            font-size: 10px;
+            text-align: center;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .tool-btn {
+            width: 70px;
+            height: 70px;
+            background: #34495e;
+            border: 3px solid #2c3e50;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.15s;
+        }
+
+        .tool-btn:hover {
+            background: #3d566e;
+            transform: translate(-3px, -3px);
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .tool-btn.selected {
+            background: #f39c12;
+            border-color: #e67e22;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .tool-icon {
+            font-size: 28px;
+        }
+
+        .tool-label {
+            font-size: 7px;
+            color: #ecf0f1;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* 底部控制栏 */
+        .bottom-bar {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(44, 62, 80, 0.95);
+            border: 4px solid #34495e;
+            padding: 15px 25px;
+            display: flex;
+            gap: 15px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .action-btn {
+            background: #e74c3c;
+            border: 3px solid #c0392b;
+            color: #ecf0f1;
+            padding: 12px 18px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 9px;
+            cursor: pointer;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+            transition: all 0.1s;
+        }
+
+        .action-btn:hover {
+            transform: translate(-3px, -3px);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .action-btn.secondary {
+            background: #3498db;
+            border-color: #2980b9;
+        }
+
+        /* 建筑信息面板 */
+        .info-panel {
+            top: 100px;
+            left: 20px;
+            background: rgba(44, 62, 80, 0.95);
+            border: 4px solid #34495e;
+            padding: 20px;
+            min-width: 280px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+
+        .info-panel.active {
+            display: block;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .info-header {
+            color: #f39c12;
+            font-size: 12px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-icon {
+            font-size: 32px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 2px solid #34495e;
+            font-size: 9px;
+        }
+
+        .info-label {
+            color: #95a5a6;
+        }
+
+        .info-value {
+            color: #ecf0f1;
+        }
+
+        .info-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .info-btn {
+            flex: 1;
+            background: #27ae60;
+            border: 2px solid #229954;
+            color: #ecf0f1;
+            padding: 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .info-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .info-btn.danger {
+            background: #e74c3c;
+            border-color: #c0392b;
+        }
+
+        /* 帮助面板 */
+        .help-panel {
+            bottom: 100px;
+            right: 20px;
+            background: rgba(44, 62, 80, 0.95);
+            border: 4px solid #34495e;
+            padding: 15px;
+            width: 220px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+            font-size: 8px;
+            line-height: 2;
+            color: #bdc3c7;
+        }
+
+        .help-title {
+            color: #f39c12;
+            font-size: 10px;
+            margin-bottom: 10px;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 100px;
+            right: 320px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: rgba(44, 62, 80, 0.95);
+            border: 4px solid #f39c12;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            min-width: 320px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+            animation: toastSlide 0.3s;
+        }
+
+        @keyframes toastSlide {
+            from {
+                transform: translateX(400px);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .toast-title {
+            color: #f39c12;
+            font-size: 10px;
+            margin-bottom: 10px;
+        }
+
+        .toast-message {
+            color: #ecf0f1;
+            font-size: 8px;
+            line-height: 1.8;
+        }
+
+        /* 加载提示 */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #2c3e50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        #loading h1 {
+            color: #f39c12;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        #loading p {
+            color: #ecf0f1;
+            font-size: 10px;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #34495e;
+            border-top-color: #f39c12;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载界面 -->
+    <div id="loading">
+        <div class="loading-spinner"></div>
+        <h1>🏙️ CityBuilder 3D</h1>
+        <p>正在加载3D引擎...</p>
+    </div>
+
+    <div id="game-container">
+        <canvas id="three-canvas"></canvas>
+
+        <!-- 顶部状态栏 -->
+        <div class="pixel-ui top-bar">
+            <div class="stat">
+                <span class="stat-icon">🏗️</span>
+                <span>建筑: <span class="stat-value" id="stat-buildings">0</span></span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">⚡</span>
+                <span>电力: <span class="stat-value" id="stat-power">100%</span></span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">💰</span>
+                <span>费用: <span class="stat-value" id="stat-cost">¥0/月</span></span>
+            </div>
+        </div>
+
+        <!-- 右侧工具栏 -->
+        <div class="pixel-ui tools-panel">
+            <div class="panel-title">🏗️ 建筑工具</div>
+
+            <button class="tool-btn" data-type="office" onclick="selectTool('office')">
+                <span class="tool-icon">🏢</span>
+                <span class="tool-label">办公楼</span>
+            </button>
+
+            <button class="tool-btn" data-type="factory" onclick="selectTool('factory')">
+                <span class="tool-icon">🏭</span>
+                <span class="tool-label">工厂</span>
+            </button>
+
+            <button class="tool-btn" data-type="bank" onclick="selectTool('bank')">
+                <span class="tool-icon">🏦</span>
+                <span class="tool-label">金库</span>
+            </button>
+
+            <button class="tool-btn" data-type="warehouse" onclick="selectTool('warehouse')">
+                <span class="tool-icon">🏪</span>
+                <span class="tool-label">仓库</span>
+            </button>
+
+            <button class="tool-btn" data-type="station" onclick="selectTool('station')">
+                <span class="tool-icon">🚂</span>
+                <span class="tool-label">车站</span>
+            </button>
+
+            <button class="tool-btn" data-type="network" onclick="selectTool('network')">
+                <span class="tool-icon">🌐</span>
+                <span class="tool-label">网络</span>
+            </button>
+
+            <button class="tool-btn" data-type="security" onclick="selectTool('security')">
+                <span class="tool-icon">🛡️</span>
+                <span class="tool-label">安保</span>
+            </button>
+
+            <button class="tool-btn" data-type="observatory" onclick="selectTool('observatory')">
+                <span class="tool-icon">📡</span>
+                <span class="tool-label">监控</span>
+            </button>
+
+            <button class="tool-btn" data-type="power" onclick="selectTool('power')">
+                <span class="tool-icon">⚡</span>
+                <span class="tool-label">电厂</span>
+            </button>
+
+            <button class="tool-btn" data-type="road" onclick="selectTool('road')">
+                <span class="tool-icon">🛣️</span>
+                <span class="tool-label">道路</span>
+            </button>
+        </div>
+
+        <!-- 左侧信息面板 -->
+        <div class="pixel-ui info-panel" id="info-panel">
+            <div class="info-header">
+                <span class="info-icon" id="info-icon">🏦</span>
+                <span id="info-title">银行金库</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">类型:</span>
+                <span class="info-value" id="info-type">数据库</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">规格:</span>
+                <span class="info-value" id="info-spec">8核32GB</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">状态:</span>
+                <span class="info-value" id="info-status">⚠️ 漂移</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">费用:</span>
+                <span class="info-value" id="info-cost">¥1,200/月</span>
+            </div>
+            <div class="info-buttons">
+                <button class="info-btn" onclick="syncBlueprint()">🔄 同步</button>
+                <button class="info-btn danger" onclick="rollback()">⚠️ 回滚</button>
+            </div>
+        </div>
+
+        <!-- 帮助面板 -->
+        <div class="pixel-ui help-panel">
+            <div class="help-title">🎮 操作指南</div>
+            🖱️ 左键：选择/放置<br>
+            🖱️ 右键：旋转视角<br>
+            🔄 滚轮：缩放<br>
+            ⌨️ WASD：平移<br>
+            🗑️ Delete：删除
+        </div>
+
+        <!-- 底部控制栏 -->
+        <div class="pixel-ui bottom-bar">
+            <button class="action-btn secondary" onclick="startCensus()">🔭 普查</button>
+            <button class="action-btn secondary" onclick="checkDrift()">🔍 稽查</button>
+            <button class="action-btn secondary" onclick="generateCode()">📝 代码</button>
+            <button class="action-btn" onclick="deploy()">🚀 部署</button>
+        </div>
+
+        <!-- Toast容器 -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <!-- 使用ES模块方式加载Three.js -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // 将THREE暴露到全局，以便其他函数使用
+        window.THREE = THREE;
+
+        // 游戏状态
+        const game = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            controls: null,
+            raycaster: null,
+            mouse: null,
+            gridHelper: null,
+            ground: null,
+            buildings: [],
+            selectedTool: null,
+            selectedBuilding: null,
+            previewMesh: null,
+            gridSize: 50,
+            tileSize: 2
+        };
+
+        // 建筑配置
+        const buildingTypes = {
+            office: { icon: '🏢', name: '办公楼', type: '微服务', cost: 800, color: 0x3498db, height: 3 },
+            factory: { icon: '🏭', name: '工厂', type: '批处理', cost: 1000, color: 0x9b59b6, height: 2 },
+            bank: { icon: '🏦', name: '金库', type: '数据库', cost: 1200, color: 0xe74c3c, height: 4 },
+            warehouse: { icon: '🏪', name: '仓库', type: '缓存', cost: 600, color: 0xf39c12, height: 2 },
+            station: { icon: '🚂', name: '车站', type: '消息队列', cost: 500, color: 0xe67e22, height: 2 },
+            network: { icon: '🌐', name: '网络中心', type: 'VPC', cost: 400, color: 0x16a085, height: 3 },
+            security: { icon: '🛡️', name: '安保', type: '安全组', cost: 300, color: 0x8e44ad, height: 2 },
+            observatory: { icon: '📡', name: '监控塔', type: '监控', cost: 350, color: 0x2980b9, height: 5 },
+            power: { icon: '⚡', name: '电厂', type: '计算', cost: 900, color: 0xf1c40f, height: 3 },
+            road: { icon: '🛣️', name: '道路', type: '连接', cost: 50, color: 0x7f8c8d, height: 0.3 }
+        };
+
+        // 初始化Three.js场景
+        function init() {
+            // 场景
+            game.scene = new THREE.Scene();
+            game.scene.background = new THREE.Color(0x87CEEB);
+            game.scene.fog = new THREE.Fog(0x87CEEB, 30, 80);
+
+            // 相机
+            game.camera = new THREE.PerspectiveCamera(
+                60,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            game.camera.position.set(20, 25, 20);
+            game.camera.lookAt(0, 0, 0);
+
+            // 渲染器
+            game.renderer = new THREE.WebGLRenderer({
+                canvas: document.getElementById('three-canvas'),
+                antialias: true
+            });
+            game.renderer.setSize(window.innerWidth, window.innerHeight);
+            game.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            game.renderer.shadowMap.enabled = true;
+            game.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // 控制器
+            game.controls = new OrbitControls(game.camera, game.renderer.domElement);
+            game.controls.enableDamping = true;
+            game.controls.dampingFactor = 0.05;
+            game.controls.maxPolarAngle = Math.PI / 2.1;
+            game.controls.minDistance = 10;
+            game.controls.maxDistance = 60;
+
+            // 光照
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            game.scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(20, 30, 20);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 100;
+            directionalLight.shadow.camera.left = -30;
+            directionalLight.shadow.camera.right = 30;
+            directionalLight.shadow.camera.top = 30;
+            directionalLight.shadow.camera.bottom = -30;
+            game.scene.add(directionalLight);
+
+            // 地面
+            createGround();
+
+            // 网格
+            game.gridHelper = new THREE.GridHelper(
+                game.gridSize * game.tileSize,
+                game.gridSize,
+                0x34495e,
+                0x2c3e50
+            );
+            game.gridHelper.position.y = 0.01;
+            game.scene.add(game.gridHelper);
+
+            // 射线检测
+            game.raycaster = new THREE.Raycaster();
+            game.mouse = new THREE.Vector2();
+
+            // 事件监听
+            setupEvents();
+
+            // 添加示例建筑
+            addSampleBuildings();
+
+            // 隐藏加载界面
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 1000);
+
+            // 开始渲染循环
+            animate();
+        }
+
+        function createGround() {
+            const geometry = new THREE.PlaneGeometry(
+                game.gridSize * game.tileSize,
+                game.gridSize * game.tileSize
+            );
+            const material = new THREE.MeshLambertMaterial({
+                color: 0x228B22
+            });
+            game.ground = new THREE.Mesh(geometry, material);
+            game.ground.rotation.x = -Math.PI / 2;
+            game.ground.receiveShadow = true;
+            game.scene.add(game.ground);
+        }
+
+        function createVoxelBuilding(type, x, z) {
+            const config = buildingTypes[type];
+            const group = new THREE.Group();
+
+            // 建筑基座
+            const baseGeometry = new THREE.BoxGeometry(
+                game.tileSize * 0.9,
+                config.height,
+                game.tileSize * 0.9
+            );
+            const baseMaterial = new THREE.MeshLambertMaterial({
+                color: config.color
+            });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.y = config.height / 2;
+            base.castShadow = true;
+            base.receiveShadow = true;
+            group.add(base);
+
+            // 顶部装饰（像像素块）
+            const topGeometry = new THREE.BoxGeometry(
+                game.tileSize * 0.5,
+                0.3,
+                game.tileSize * 0.5
+            );
+            const topMaterial = new THREE.MeshLambertMaterial({
+                color: shadeColor(config.color, 20)
+            });
+            const top = new THREE.Mesh(topGeometry, topMaterial);
+            top.position.y = config.height + 0.15;
+            top.castShadow = true;
+            group.add(top);
+
+            // 设置位置
+            group.position.set(
+                (x - game.gridSize / 2) * game.tileSize + game.tileSize / 2,
+                0,
+                (z - game.gridSize / 2) * game.tileSize + game.tileSize / 2
+            );
+
+            group.userData = { type, x, z, config };
+            return group;
+        }
+
+        function shadeColor(color, percent) {
+            const num = color;
+            const amt = Math.round(2.55 * percent);
+            const R = (num >> 16) + amt;
+            const G = (num >> 8 & 0x00FF) + amt;
+            const B = (num & 0x0000FF) + amt;
+            return (R << 16) | (G << 8) | B;
+        }
+
+        function addSampleBuildings() {
+            const samples = [
+                { type: 'office', x: 15, z: 15 },
+                { type: 'factory', x: 20, z: 15 },
+                { type: 'bank', x: 15, z: 20 },
+                { type: 'warehouse', x: 20, z: 20 },
+                { type: 'power', x: 25, z: 17 },
+                { type: 'network', x: 17, z: 25 }
+            ];
+
+            samples.forEach(sample => {
+                const building = createVoxelBuilding(sample.type, sample.x, sample.z);
+                game.scene.add(building);
+                game.buildings.push(building);
+            });
+
+            updateStats();
+        }
+
+        function setupEvents() {
+            window.addEventListener('resize', onWindowResize);
+
+            const canvas = game.renderer.domElement;
+            canvas.addEventListener('click', onMouseClick);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            // 键盘控制
+            document.addEventListener('keydown', (e) => {
+                const speed = 0.5;
+                switch(e.key.toLowerCase()) {
+                    case 'w':
+                        game.camera.position.z -= speed;
+                        break;
+                    case 's':
+                        game.camera.position.z += speed;
+                        break;
+                    case 'a':
+                        game.camera.position.x -= speed;
+                        break;
+                    case 'd':
+                        game.camera.position.x += speed;
+                        break;
+                    case 'delete':
+                        deleteSelectedBuilding();
+                        break;
+                    case 'escape':
+                        cancelSelection();
+                        break;
+                }
+            });
+        }
+
+        function onWindowResize() {
+            game.camera.aspect = window.innerWidth / window.innerHeight;
+            game.camera.updateProjectionMatrix();
+            game.renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function getGridPosition(event) {
+            game.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            game.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            game.raycaster.setFromCamera(game.mouse, game.camera);
+            const intersects = game.raycaster.intersectObject(game.ground);
+
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                const x = Math.floor(point.x / game.tileSize + game.gridSize / 2);
+                const z = Math.floor(point.z / game.tileSize + game.gridSize / 2);
+
+                if (x >= 0 && x < game.gridSize && z >= 0 && z < game.gridSize) {
+                    return { x, z };
+                }
+            }
+            return null;
+        }
+
+        function onMouseMove(event) {
+            if (!game.selectedTool) return;
+
+            const pos = getGridPosition(event);
+            if (pos) {
+                if (!game.previewMesh) {
+                    const config = buildingTypes[game.selectedTool];
+                    game.previewMesh = createVoxelBuilding(game.selectedTool, pos.x, pos.z);
+                    game.previewMesh.traverse((child) => {
+                        if (child.isMesh) {
+                            child.material = child.material.clone();
+                            child.material.transparent = true;
+                            child.material.opacity = 0.5;
+                        }
+                    });
+                    game.scene.add(game.previewMesh);
+                } else {
+                    game.previewMesh.position.set(
+                        (pos.x - game.gridSize / 2) * game.tileSize + game.tileSize / 2,
+                        0,
+                        (pos.z - game.gridSize / 2) * game.tileSize + game.tileSize / 2
+                    );
+                }
+            }
+        }
+
+        function onMouseClick(event) {
+            if (event.button !== 0) return; // 只响应左键
+
+            const pos = getGridPosition(event);
+            if (!pos) return;
+
+            // 检查是否有建筑
+            const existing = game.buildings.find(b =>
+                b.userData.x === pos.x && b.userData.z === pos.z
+            );
+
+            if (existing) {
+                showBuildingInfo(existing);
+            } else if (game.selectedTool) {
+                placeBuilding(pos.x, pos.z);
+            }
+        }
+
+        function selectTool(tool) {
+            game.selectedTool = tool;
+
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.querySelector(`[data-type="${tool}"]`).classList.add('selected');
+
+            const config = buildingTypes[tool];
+            showToast('工具已选择', `点击地面放置 ${config.name}`);
+        }
+
+        function placeBuilding(x, z) {
+            const building = createVoxelBuilding(game.selectedTool, x, z);
+            game.scene.add(building);
+            game.buildings.push(building);
+
+            // 播放放置动画
+            building.scale.set(0, 0, 0);
+            animateBuildingPlacement(building);
+
+            showToast('建造完成', `${buildingTypes[game.selectedTool].name} 已建成！`);
+            updateStats();
+        }
+
+        function animateBuildingPlacement(building) {
+            const duration = 500;
+            const start = Date.now();
+
+            function animate() {
+                const elapsed = Date.now() - start;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // 弹跳效果
+                const scale = easeOutBack(progress);
+                building.scale.set(scale, scale, scale);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+
+            function easeOutBack(t) {
+                const c1 = 1.70158;
+                const c3 = c1 + 1;
+                return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+            }
+
+            animate();
+        }
+
+        function showBuildingInfo(building) {
+            const config = building.userData.config;
+            const panel = document.getElementById('info-panel');
+
+            document.getElementById('info-icon').textContent = config.icon;
+            document.getElementById('info-title').textContent = config.name;
+            document.getElementById('info-type').textContent = config.type;
+            document.getElementById('info-spec').textContent = '标准规格';
+            document.getElementById('info-status').textContent = '✓ 正常';
+            document.getElementById('info-cost').textContent = `¥${config.cost}/月`;
+
+            panel.classList.add('active');
+            game.selectedBuilding = building;
+        }
+
+        function deleteSelectedBuilding() {
+            if (game.selectedBuilding) {
+                game.scene.remove(game.selectedBuilding);
+                const index = game.buildings.indexOf(game.selectedBuilding);
+                if (index > -1) {
+                    game.buildings.splice(index, 1);
+                }
+
+                document.getElementById('info-panel').classList.remove('active');
+                game.selectedBuilding = null;
+                updateStats();
+                showToast('删除成功', '建筑已移除');
+            }
+        }
+
+        function cancelSelection() {
+            game.selectedTool = null;
+            game.selectedBuilding = null;
+
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+
+            document.getElementById('info-panel').classList.remove('active');
+
+            if (game.previewMesh) {
+                game.scene.remove(game.previewMesh);
+                game.previewMesh = null;
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('stat-buildings').textContent = game.buildings.length;
+
+            const totalCost = game.buildings.reduce((sum, b) => {
+                return sum + b.userData.config.cost;
+            }, 0);
+            document.getElementById('stat-cost').textContent = `¥${totalCost}/月`;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            game.controls.update();
+            game.renderer.render(game.scene, game.camera);
+        }
+
+        function showToast(title, message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // 操作按钮
+        function startCensus() {
+            showToast('🔭 城市普查', '扫描现网资源生成蓝图...');
+        }
+
+        function checkDrift() {
+            showToast('🔍 违建稽查', '未发现配置漂移 ✓');
+        }
+
+        function generateCode() {
+            showToast('📝 生成代码', 'IaC代码已生成！');
+        }
+
+        function deploy() {
+            showToast('🚀 开始部署', '部署流程已启动...');
+        }
+
+        function syncBlueprint() {
+            showToast('🔄 同步蓝图', '配置已同步到IaC代码');
+        }
+
+        function rollback() {
+            showToast('⚠️ 回滚', '建筑已恢复到蓝图状态');
+        }
+
+        // 检查Three.js是否加载成功
+        window.addEventListener('load', function() {
+            // 延迟一下，确保模块加载完成
+            setTimeout(() => {
+                if (typeof window.THREE === 'undefined') {
+                    document.getElementById('loading').innerHTML = `
+                        <div style="color: #e74c3c; font-size: 14px; text-align: center; padding: 20px;">
+                            ❌ Three.js 加载失败<br><br>
+                            <span style="font-size: 10px;">请检查网络连接或刷新页面重试</span>
+                        </div>
+                    `;
+                    console.error('Three.js failed to load');
+                } else {
+                    console.log('Three.js loaded successfully, version:', window.THREE.REVISION);
+                    init();
+                }
+            }, 100);
+        });
+
+        // 启动游戏
+        // window.onload = init; // 已移除，改用上面的加载检测
+    </script>
+</body>
+</html>

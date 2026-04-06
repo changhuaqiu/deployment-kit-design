@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CityBuilder - OAM驱动的城市规划系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a1a;
+            color: #eee;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .city-container {
+            display: grid;
+            grid-template-rows: 50px 1fr 180px;
+            height: 100vh;
+        }
+
+        /* 顶部城市信息栏 */
+        .city-hud {
+            background: linear-gradient(180deg, rgba(22, 33, 62, 0.95) 0%, rgba(15, 15, 30, 0.95) 100%);
+            border-bottom: 2px solid #f39c12;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 25px;
+            box-shadow: 0 2px 20px rgba(243, 156, 18, 0.3);
+        }
+
+        .city-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .city-name-icon {
+            font-size: 24px;
+        }
+
+        .city-name-text {
+            font-size: 18px;
+            font-weight: bold;
+            background: linear-gradient(90deg, #f39c12, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .city-stats {
+            display: flex;
+            gap: 20px;
+        }
+
+        .stat-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(243, 156, 18, 0.1);
+            padding: 5px 12px;
+            border-radius: 15px;
+            border: 1px solid rgba(243, 156, 18, 0.3);
+        }
+
+        .stat-icon {
+            font-size: 14px;
+        }
+
+        .stat-value {
+            font-size: 13px;
+            font-weight: bold;
+            color: #f39c12;
+        }
+
+        .environment-selector {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+        }
+
+        .env-tab {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(243, 156, 18, 0.2);
+            color: #aaa;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+        }
+
+        .env-tab.active {
+            background: rgba(243, 156, 18, 0.2);
+            border-color: #f39c12;
+            color: #f39c12;
+        }
+
+        .env-tab:hover {
+            border-color: #f39c12;
+        }
+
+        /* 主城市场景 */
+        .city-view {
+            position: relative;
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1e 100%);
+            overflow: hidden;
+        }
+
+        /* 城市背景 */
+        .city-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(circle at 30% 40%, rgba(243, 156, 18, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 70% 60%, rgba(231, 76, 60, 0.05) 0%, transparent 50%);
+        }
+
+        /* 街区网格 */
+        .district-grid {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: grid;
+            grid-template-columns: repeat(3, 280px);
+            grid-template-rows: repeat(2, 200px);
+            gap: 20px;
+        }
+
+        /* 街区 */
+        .district {
+            background: rgba(15, 15, 30, 0.8);
+            border: 2px solid rgba(243, 156, 18, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .district:hover {
+            border-color: #f39c12;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(243, 156, 18, 0.3);
+        }
+
+        .district.selected {
+            border-color: #00ff88;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+        }
+
+        .district-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .district-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #f39c12;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .district-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(243, 156, 18, 0.2);
+            color: #f39c12;
+        }
+
+        .district-buildings {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .building-icon {
+            font-size: 28px;
+            text-align: center;
+            filter: drop-shadow(0 0 5px currentColor);
+            position: relative;
+        }
+
+        .building-icon.has-warning::after {
+            content: '⚠️';
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            font-size: 12px;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .district-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #aaa;
+        }
+
+        .district-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .district-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f39c12, #e74c3c);
+            transition: width 0.3s ease;
+        }
+
+        /* 建筑详情面板（放大镜） */
+        .building-detail {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(15, 15, 30, 0.98);
+            border: 2px solid #f39c12;
+            border-radius: 16px;
+            padding: 25px;
+            min-width: 500px;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        .building-detail.active {
+            opacity: 1;
+            pointer-events: all;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .detail-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .detail-icon {
+            font-size: 48px;
+        }
+
+        .detail-info {
+            flex: 1;
+        }
+
+        .detail-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #f39c12;
+            margin-bottom: 5px;
+        }
+
+        .detail-type {
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .detail-close {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .detail-sections {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .detail-section {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(243, 156, 18, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .section-title {
+            font-size: 11px;
+            color: #f39c12;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .section-content {
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .resource-list {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .resource-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        .resource-name {
+            font-size: 11px;
+            color: #fff;
+        }
+
+        .resource-status {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        /* 底部施工面板 */
+        .construction-panel {
+            background: rgba(15, 15, 30, 0.95);
+            border-top: 2px solid #f39c12;
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            gap: 0;
+        }
+
+        .panel-section {
+            padding: 15px;
+            border-right: 1px solid rgba(243, 156, 18, 0.2);
+        }
+
+        .panel-section:last-child {
+            border-right: none;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: #f39c12;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* 施工按钮 */
+        .construction-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .construction-btn {
+            background: rgba(243, 156, 18, 0.1);
+            border: 1px solid rgba(243, 156, 18, 0.3);
+            color: #f39c12;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .construction-btn:hover {
+            background: rgba(243, 156, 18, 0.2);
+            border-color: #f39c12;
+        }
+
+        .construction-btn.primary {
+            background: linear-gradient(135deg, #f39c12, #e74c3c);
+            border-color: #e74c3c;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .construction-btn.warning {
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+
+        .btn-icon {
+            font-size: 18px;
+        }
+
+        .btn-text {
+            flex: 1;
+        }
+
+        .btn-hint {
+            font-size: 9px;
+            color: #aaa;
+        }
+
+        /* 施工许可流程 */
+        .permit-stages {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .stage-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            border-left: 3px solid #555;
+        }
+
+        .stage-item.pending {
+            border-left-color: #555;
+            opacity: 0.5;
+        }
+
+        .stage-item.in-progress {
+            border-left-color: #f39c12;
+            background: rgba(243, 156, 18, 0.1);
+        }
+
+        .stage-item.completed {
+            border-left-color: #00ff88;
+        }
+
+        .stage-item.failed {
+            border-left-color: #ff6b6b;
+        }
+
+        .stage-icon {
+            font-size: 16px;
+        }
+
+        .stage-info {
+            flex: 1;
+        }
+
+        .stage-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 2px;
+        }
+
+        .stage-desc {
+            font-size: 10px;
+            color: #aaa;
+        }
+
+        .stage-status {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 法规面板 */
+        .policy-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .policy-item {
+            background: rgba(231, 76, 60, 0.1);
+            border: 1px solid rgba(231, 76, 60, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .policy-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        .policy-icon {
+            font-size: 14px;
+        }
+
+        .policy-name {
+            font-size: 11px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .policy-desc {
+            font-size: 10px;
+            color: #aaa;
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #f39c12;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #e74c3c;
+        }
+
+        /* 动画 */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="city-container">
+        <!-- 顶部城市HUD -->
+        <div class="city-hud">
+            <div class="city-name">
+                <span class="city-name-icon">🏙️</span>
+                <span class="city-name-text">订单应用城市</span>
+            </div>
+            <div class="city-stats">
+                <div class="stat-badge">
+                    <span class="stat-icon">🏢</span>
+                    <span class="stat-value">12 建筑</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-icon">📊</span>
+                    <span class="stat-value">99.9% 可用性</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-icon">💰</span>
+                    <span class="stat-value">¥8,500/月</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-icon">⚠️</span>
+                    <span class="stat-value">3 待办</span>
+                </div>
+            </div>
+            <div class="environment-selector">
+                <div class="env-tab">开发环境</div>
+                <div class="env-tab">测试环境</div>
+                <div class="env-tab active">生产环境</div>
+            </div>
+        </div>
+
+        <!-- 主城市场景 -->
+        <div class="city-view">
+            <div class="city-background"></div>
+
+            <!-- 街区网格 -->
+            <div class="district-grid">
+                <!-- 商业街区 -->
+                <div class="district" onclick="selectDistrict('business')">
+                    <div class="district-header">
+                        <div class="district-name">
+                            <span>🏢</span>
+                            <span>商业街区</span>
+                        </div>
+                        <span class="district-badge">4建筑</span>
+                    </div>
+                    <div class="district-buildings">
+                        <div class="building-icon has-warning" style="color: #3498db;">🏢</div>
+                        <div class="building-icon" style="color: #3498db;">🏢</div>
+                        <div class="building-icon" style="color: #9b59b6;">⚖️</div>
+                        <div class="building-icon" style="color: #1abc9c;">🏭</div>
+                    </div>
+                    <div class="district-stats">
+                        <span>CPU: 67%</span>
+                        <span>内存: 72%</span>
+                    </div>
+                    <div class="district-progress">
+                        <div class="district-progress-fill" style="width: 72%;"></div>
+                    </div>
+                </div>
+
+                <!-- 数据仓储区 -->
+                <div class="district" onclick="selectDistrict('data')">
+                    <div class="district-header">
+                        <div class="district-name">
+                            <span>🏦</span>
+                            <span>数据仓储区</span>
+                        </div>
+                        <span class="district-badge">3建筑</span>
+                    </div>
+                    <div class="district-buildings">
+                        <div class="building-icon has-warning" style="color: #e74c3c;">🏦</div>
+                        <div class="building-icon" style="color: #f39c12;">💾</div>
+                        <div class="building-icon" style="color: #e67e22;">🚂</div>
+                    </div>
+                    <div class="district-stats">
+                        <span>存储: 45%</span>
+                        <span>IOPS: 8.2K</span>
+                    </div>
+                    <div class="district-progress">
+                        <div class="district-progress-fill" style="width: 45%;"></div>
+                    </div>
+                </div>
+
+                <!-- 网络交通区 -->
+                <div class="district" onclick="selectDistrict('network')">
+                    <div class="district-header">
+                        <div class="district-name">
+                            <span>🌐</span>
+                            <span>网络交通区</span>
+                        </div>
+                        <span class="district-badge">2建筑</span>
+                    </div>
+                    <div class="district-buildings">
+                        <div class="building-icon" style="color: #16a085;">🌐</div>
+                        <div class="building-icon" style="color: #e74c3c;">🛡️</div>
+                    </div>
+                    <div class="district-stats">
+                        <span>带宽: 120Mbps</span>
+                        <span>连接: 8K</span>
+                    </div>
+                    <div class="district-progress">
+                        <div class="district-progress-fill" style="width: 60%;"></div>
+                    </div>
+                </div>
+
+                <!-- 安全治理区 -->
+                <div class="district" onclick="selectDistrict('security')">
+                    <div class="district-header">
+                        <div class="district-name">
+                            <span>⚖️</span>
+                            <span>安全治理区</span>
+                        </div>
+                        <span class="district-badge">2建筑</span>
+                    </div>
+                    <div class="district-buildings">
+                        <div class="building-icon" style="color: #8e44ad;">🔐</div>
+                        <div class="building-icon" style="color: #27ae60;">📜</div>
+                    </div>
+                    <div class="district-stats">
+                        <span>合规: 100%</span>
+                        <span>审计: 通过</span>
+                    </div>
+                    <div class="district-progress">
+                        <div class="district-progress-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+
+                <!-- 可观测性区 -->
+                <div class="district" onclick="selectDistrict('observability')">
+                    <div class="district-header">
+                        <div class="district-name">
+                            <span>📊</span>
+                            <span>城市监控中心</span>
+                        </div>
+                        <span class="district-badge">1建筑</span>
+                    </div>
+                    <div class="district-buildings">
+                        <div class="building-icon" style="color: #2980b9;">📊</div>
+                    </div>
+                    <div class="district-stats">
+                        <span>日志: 2.3GB</span>
+                        <span>告警: 0</span>
+                    </div>
+                    <div class="district-progress">
+                        <div class="district-progress-fill" style="width: 85%;"></div>
+                    </div>
+                </div>
+
+                <!-- 新开发区 -->
+                <div class="district" onclick="selectDistrict('new')" style="border-style: dashed; opacity: 0.6;">
+                    <div class="district-header">
+                        <div class="district-name">
+                            <span>🚧</span>
+                            <span>新开发区</span>
+                        </div>
+                        <span class="district-badge">规划中</span>
+                    </div>
+                    <div class="district-buildings">
+                        <div style="grid-column: 1/-1; text-align: center; color: #555; padding: 20px;">
+                            点击开始规划新区
+                        </div>
+                    </div>
+                    <div class="district-stats">
+                        <span>状态: 待建设</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 建筑详情放大镜 -->
+            <div class="building-detail" id="building-detail">
+                <div class="detail-header">
+                    <span class="detail-icon">🏦</span>
+                    <div class="detail-info">
+                        <div class="detail-name">主数据库金库</div>
+                        <div class="detail-type">Component: RDS MySQL · 高可用架构</div>
+                    </div>
+                    <button class="detail-close" onclick="closeBuildingDetail()">✕</button>
+                </div>
+                <div class="detail-sections">
+                    <div class="detail-section">
+                        <div class="section-title">🏗️ 建筑部件</div>
+                        <div class="section-content">
+                            <div class="resource-list">
+                                <div class="resource-item">
+                                    <span>🗄️</span>
+                                    <span class="resource-name">主实例 (db-master)</span>
+                                    <span class="resource-status">运行中</span>
+                                </div>
+                                <div class="resource-item">
+                                    <span>📦</span>
+                                    <span class="resource-name">只读副本 x2</span>
+                                    <span class="resource-status">运行中</span>
+                                </div>
+                                <div class="resource-item">
+                                    <span>💾</span>
+                                    <span class="resource-name">自动备份</span>
+                                    <span class="resource-status">运行中</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="section-title">🔧 建筑配套 (Traits)</div>
+                        <div class="section-content">
+                            <div class="resource-list">
+                                <div class="resource-item">
+                                    <span>🛡️</span>
+                                    <span class="resource-name">高可用 (HA)</span>
+                                    <span class="resource-status">已启用</span>
+                                </div>
+                                <div class="resource-item">
+                                    <span>📈</span>
+                                    <span class="resource-name">自动扩容</span>
+                                    <span class="resource-status">已启用</span>
+                                </div>
+                                <div class="resource-item">
+                                    <span>⏰</span>
+                                    <span class="resource-name">定时备份</span>
+                                    <span class="resource-status">每天02:00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="section-title">⚠️ 状态检查</div>
+                        <div class="section-content">
+                            <div style="color: #feca57; margin-bottom: 5px;">
+                                ⚠️ 检测到配置漂移
+                            </div>
+                            <div style="font-size: 10px; color: #aaa;">
+                                实例规格与代码定义不一致
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="section-title">⚡ 快速操作</div>
+                        <div class="section-content">
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <button class="construction-btn" onclick="syncToBlueprint()">
+                                    <span class="btn-icon">🔄</span>
+                                    <span class="btn-text">同步到蓝图</span>
+                                </button>
+                                <button class="construction-btn warning" onclick="rollbackInfra()">
+                                    <span class="btn-icon">⚠️</span>
+                                    <span class="btn-text">回滚现网</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部施工面板 -->
+        <div class="construction-panel">
+            <!-- 施工命令 -->
+            <div class="panel-section">
+                <div class="section-header">
+                    <span>🏗️</span>
+                    <span>施工命令</span>
+                </div>
+                <div class="construction-actions">
+                    <button class="construction-btn" onclick="startCensus()">
+                        <span class="btn-icon">🔭</span>
+                        <span class="btn-text">城市普查</span>
+                        <span class="btn-hint">扫描现网生成蓝图</span>
+                    </button>
+                    <button class="construction-btn" onclick="showViolationReport()">
+                        <span class="btn-icon">🔍</span>
+                        <span class="btn-text">违建稽查</span>
+                        <span class="btn-hint">检测配置漂移</span>
+                    </button>
+                    <button class="construction-btn" onclick="planNewDistrict()">
+                        <span class="btn-icon">📐</span>
+                        <span class="btn-text">新区规划</span>
+                        <span class="btn-hint">从零创建应用</span>
+                    </button>
+                    <button class="construction-btn primary" onclick="startConstruction()">
+                        <span class="btn-icon">🚧</span>
+                        <span class="btn-text">开始施工</span>
+                        <span class="btn-hint">执行变更计划</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 施工许可流程 -->
+            <div class="panel-section">
+                <div class="section-header">
+                    <span>📋</span>
+                    <span>施工许可流程</span>
+                </div>
+                <div class="permit-stages">
+                    <div class="stage-item completed">
+                        <span class="stage-icon">✅</span>
+                        <div class="stage-info">
+                            <div class="stage-name">图纸格式审查</div>
+                            <div class="stage-desc">IaC代码语法检查通过</div>
+                        </div>
+                        <span class="stage-status">已完成</span>
+                    </div>
+                    <div class="stage-item completed">
+                        <span class="stage-icon">✅</span>
+                        <div class="stage-info">
+                            <div class="stage-name">施工影响评估</div>
+                            <div class="stage-desc">预计影响：2个街区，15分钟维护窗口</div>
+                        </div>
+                        <span class="stage-status">已完成</span>
+                    </div>
+                    <div class="stage-item in-progress">
+                        <span class="stage-icon">🔄</span>
+                        <div class="stage-info">
+                            <div class="stage-name">沙盘推演</div>
+                            <div class="stage-desc">在测试环境模拟施工中...</div>
+                        </div>
+                        <span class="stage-status">进行中</span>
+                    </div>
+                    <div class="stage-item pending">
+                        <span class="stage-icon">⏳</span>
+                        <div class="stage-info">
+                            <div class="stage-name">试通车</div>
+                            <div class="stage-desc">生产环境灰度发布（Canary）</div>
+                        </div>
+                        <span class="stage-status">等待中</span>
+                    </div>
+                    <div class="stage-item pending">
+                        <span class="stage-icon">⏳</span>
+                        <div class="stage-info">
+                            <div class="stage-name">竣工验收</div>
+                            <div class="stage-desc">确认所有指标正常</div>
+                        </div>
+                        <span class="stage-status">等待中</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 城市法规 -->
+            <div class="panel-section">
+                <div class="section-header">
+                    <span>⚖️</span>
+                    <span>城市法规</span>
+                </div>
+                <div class="policy-list">
+                    <div class="policy-item">
+                        <div class="policy-header">
+                            <span class="policy-icon">🚫</span>
+                            <span class="policy-name">生产变更窗口</span>
+                        </div>
+                        <div class="policy-desc">只能在凌晨02:00-06:00进行变更</div>
+                    </div>
+                    <div class="policy-item">
+                        <div class="policy-header">
+                            <span class="policy-icon">👥</span>
+                            <span class="policy-name">双人审批</span>
+                        </div>
+                        <div class="policy-desc">数据变更必须通过技术负责人审批</div>
+                    </div>
+                    <div class="policy-item">
+                        <div class="policy-header">
+                            <span class="policy-icon">💰</span>
+                            <span class="policy-name">预算控制</span>
+                        </div>
+                        <div class="policy-desc">单月维护费不超过¥10,000</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedDistrict = null;
+
+        // 选择街区
+        function selectDistrict(districtId) {
+            // 移除之前的选中状态
+            document.querySelectorAll('.district').forEach(d => d.classList.remove('selected'));
+
+            // 添加选中状态
+            event.currentTarget.classList.add('selected');
+            selectedDistrict = districtId;
+
+            // 如果点击的是有建筑的街区，显示建筑详情
+            if (districtId !== 'new') {
+                showBuildingDetail();
+            }
+        }
+
+        // 显示建筑详情
+        function showBuildingDetail() {
+            const detail = document.getElementById('building-detail');
+            detail.classList.add('active');
+        }
+
+        // 关闭建筑详情
+        function closeBuildingDetail() {
+            const detail = document.getElementById('building-detail');
+            detail.classList.remove('active');
+        }
+
+        // 城市普查
+        function startCensus() {
+            alert('🔭 开始城市普查...\n\n正在扫描现网资源并生成城市蓝图...\n\n发现12个建筑，3个街区\n预计生成时间：2分钟');
+        }
+
+        // 违建稽查
+        function showViolationReport() {
+            alert('🔍 违建稽查报告\n\n发现问题：\n⚠️ 主数据库金库 - 配置漂移\n  实例规格：s2.xlarge.4 (代码: s2.large.2)\n  需要整改或申请豁免');
+        }
+
+        // 新区规划
+        function planNewDistrict() {
+            alert('📐 新区规划向导\n\n1. 选择街区类型（商业/数据/网络）\n2. 设计建筑布局\n3. 配置法规约束\n4. 生成施工图纸');
+        }
+
+        // 开始施工
+        function startConstruction() {
+            alert('🚧 开始施工\n\n当前阶段：沙盘推演（测试环境部署）\n\n完成后将进入：试通车（生产灰度）\n\n预计总耗时：25分钟');
+        }
+
+        // 同步到蓝图
+        function syncToBlueprint() {
+            alert('🔄 同步到蓝图\n\n将主数据库金库的当前配置\n更新到城市蓝图（IaC代码）\n\n这将创建一个新的蓝图版本');
+        }
+
+        // 回滚现网
+        function rollbackInfra() {
+            if (confirm('⚠️ 确定要回滚现网配置吗？\n\n这将把主数据库金库恢复到\n蓝图定义的规格（s2.large.2）\n\n可能导致短暂服务中断')) {
+                alert('✅ 回滚计划已提交\n\n预计执行时间：维护窗口期间');
+            }
+        }
+
+        // 点击空白区域关闭详情
+        document.querySelector('.city-view').addEventListener('click', function(e) {
+            if (e.target === this || e.target.classList.contains('city-background')) {
+                closeBuildingDetail();
+                document.querySelectorAll('.district').forEach(d => d.classList.remove('selected'));
+            }
+        });
+    </script>
+</body>
+</html>

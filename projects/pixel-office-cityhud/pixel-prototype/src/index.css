@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --px-bg: #0b1020;
+  --px-panel: #121a33;
+  --px-panel-2: #0f1730;
+  --px-border: #2b3563;
+  --px-text: #e6e9ff;
+  --px-muted: #9aa3d2;
+  --px-accent: #6cffb3;
+  --px-info: #5cc8ff;
+  --px-warn: #ffcc66;
+  --px-danger: #ff5c7a;
+}
+
+.px-font {
+  font-family: 'Press Start 2P', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--px-bg);
+  color: var(--px-text);
+}
+
+@layer components {
+  .px-panel {
+    @apply rounded-lg;
+    background: linear-gradient(180deg, color-mix(in oklab, var(--px-panel) 90%, black 10%), var(--px-panel));
+    border: 2px solid var(--px-border);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  .px-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition;
+    border: 2px solid var(--px-border);
+    background: color-mix(in oklab, var(--px-panel) 88%, black 12%);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .px-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .px-btn:active {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .px-btn-primary {
+    background: color-mix(in oklab, var(--px-accent) 24%, var(--px-panel));
+  }
+
+  .px-btn-danger {
+    background: color-mix(in oklab, var(--px-danger) 22%, var(--px-panel));
+  }
+
+  .px-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+}

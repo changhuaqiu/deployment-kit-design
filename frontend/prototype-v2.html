@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IaC 部署管理 - 场景化界面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-rows: 60px 1fr 40px;
+            height: 100vh;
+        }
+
+        /* 顶部导航栏 */
+        .navbar {
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border-bottom: 2px solid #00d9ff;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 20px;
+            box-shadow: 0 2px 10px rgba(0, 217, 255, 0.3);
+        }
+
+        .navbar h1 {
+            font-size: 20px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .nav-link {
+            background: rgba(0, 217, 255, 0.1);
+            border: 1px solid #00d9ff;
+            color: #00d9ff;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background: #00d9ff;
+            color: #000;
+        }
+
+        /* 主内容区域 */
+        .main-content {
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 场景选择页面 */
+        .scenario-selection {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 40px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .scenario-card {
+            background: rgba(15, 15, 30, 0.9);
+            border: 2px solid rgba(0, 217, 255, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .scenario-card:hover {
+            border-color: #00d9ff;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.3);
+        }
+
+        .scenario-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .scenario-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00d9ff;
+            margin-bottom: 10px;
+        }
+
+        .scenario-description {
+            font-size: 13px;
+            color: #aaa;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .scenario-badge {
+            display: inline-block;
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .scenario-dev {
+            border-color: rgba(52, 152, 219, 0.5);
+        }
+
+        .scenario-dev:hover {
+            border-color: #3498db;
+            box-shadow: 0 10px 30px rgba(52, 152, 219, 0.3);
+        }
+
+        .scenario-deploy {
+            border-color: rgba(246, 36, 89, 0.5);
+        }
+
+        .scenario-deploy:hover {
+            border-color: #f62459;
+            box-shadow: 0 10px 30px rgba(246, 36, 89, 0.3);
+        }
+
+        /* 场景视图 */
+        .scenario-view {
+            display: none;
+            height: 100%;
+        }
+
+        .scenario-view.active {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 2px;
+            height: 100%;
+        }
+
+        /* 左侧面板 */
+        .left-panel {
+            background: #0f0f1e;
+            border-right: 2px solid #00d9ff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-section {
+            padding: 15px;
+            border-bottom: 1px solid rgba(0, 217, 255, 0.2);
+        }
+
+        .panel-title {
+            font-size: 13px;
+            color: #00d9ff;
+            margin-bottom: 10px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .resource-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .resource-item {
+            background: rgba(0, 217, 255, 0.05);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .resource-item:hover {
+            background: rgba(0, 217, 255, 0.1);
+            border-color: #00d9ff;
+        }
+
+        .resource-item.selected {
+            background: rgba(0, 217, 255, 0.2);
+            border-color: #00d9ff;
+        }
+
+        .resource-item-icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .resource-item-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 3px;
+        }
+
+        .resource-item-status {
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        /* 中间地图 */
+        .center-panel {
+            background: #0a0a1a;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(0, 217, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 217, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        .map-unit {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .map-unit-icon {
+            font-size: 40px;
+            filter: drop-shadow(0 0 10px currentColor);
+            position: relative;
+        }
+
+        .map-unit-label {
+            font-size: 10px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 6px;
+            border-radius: 6px;
+            margin-top: 5px;
+            white-space: nowrap;
+        }
+
+        .map-unit-status {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #0a0a1a;
+        }
+
+        .map-unit-status.added {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        .map-unit-status.changed {
+            background: #feca57;
+            box-shadow: 0 0 10px #feca57;
+        }
+
+        .map-unit-status.removed {
+            background: #ff6b6b;
+            box-shadow: 0 0 10px #ff6b6b;
+        }
+
+        /* 右侧面板 */
+        .right-panel {
+            background: #0f0f1e;
+            border-left: 2px solid #00d9ff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 15px;
+        }
+
+        .action-btn {
+            background: rgba(0, 217, 255, 0.2);
+            border: 1px solid #00d9ff;
+            color: #00d9ff;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .action-btn:hover {
+            background: #00d9ff;
+            color: #000;
+        }
+
+        .action-btn.primary {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            border-color: #00ff88;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .action-btn.danger {
+            background: rgba(255, 107, 107, 0.2);
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+
+        .action-btn.danger:hover {
+            background: #ff6b6b;
+            color: #000;
+        }
+
+        .diff-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .diff-item {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .diff-item-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .diff-item-badge {
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .diff-item-badge.added {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .diff-item-badge.changed {
+            background: rgba(254, 202, 87, 0.2);
+            color: #feca57;
+        }
+
+        .diff-item-badge.removed {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+        }
+
+        .diff-item-field {
+            font-size: 11px;
+            margin: 5px 0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .diff-field-name {
+            color: #aaa;
+            min-width: 80px;
+        }
+
+        .diff-field-old {
+            color: #ff6b6b;
+            text-decoration: line-through;
+        }
+
+        .diff-field-new {
+            color: #00ff88;
+        }
+
+        /* 底部状态栏 */
+        .status-bar {
+            background: #0f0f1e;
+            border-top: 2px solid #00d9ff;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 20px;
+            font-size: 11px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #aaa;
+        }
+
+        .status-item.success {
+            color: #00ff88;
+        }
+
+        .status-item.warning {
+            color: #feca57;
+        }
+
+        .status-item.error {
+            color: #ff6b6b;
+        }
+
+        /* 动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .scenario-card {
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+
+        /* 响应式 */
+        @media (max-width: 1200px) {
+            .scenario-view.active {
+                grid-template-columns: 250px 1fr 300px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .scenario-view.active {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+
+            .left-panel, .right-panel {
+                border: none;
+                border-bottom: 2px solid #00d9ff;
+            }
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #00d9ff;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ff88;
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #0f0f1e;
+            border: 2px solid #00d9ff;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            color: #00d9ff;
+            margin-bottom: 20px;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* 进度条 */
+        .progress-bar {
+            height: 4px;
+            background: rgba(0, 217, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部导航栏 -->
+        <div class="navbar">
+            <h1>🚀 IaC 部署管理</h1>
+            <div class="nav-links">
+                <div class="nav-link active" onclick="showScenarioSelection()">场景选择</div>
+                <div class="nav-link" onclick="alert('开发中')">资源管理</div>
+                <div class="nav-link" onclick="alert('开发中')">部署历史</div>
+                <div class="nav-link" onclick="alert('开发中')">设置</div>
+            </div>
+        </div>
+
+        <!-- 主内容区域 -->
+        <div class="main-content">
+            <!-- 场景选择页面 -->
+            <div class="scenario-selection" id="scenario-selection">
+                <h2 style="color: #00d9ff; margin-bottom: 20px; grid-column: 1/-1;">选择您的使用场景</h2>
+
+                <!-- 开发阶段场景 -->
+                <div class="scenario-card scenario-dev" onclick="openScenario('reverse-engineer')">
+                    <div class="scenario-icon">🔄</div>
+                    <div class="scenario-title">场景A: 现网资源 → IaC 代码</div>
+                    <div class="scenario-description">
+                        将现有基础设施转化为代码，实现 IaC 转型。扫描现网资源，自动生成标准化的 IaC 代码。
+                    </div>
+                    <span class="scenario-badge">开发阶段</span>
+                </div>
+
+                <div class="scenario-card scenario-dev" onclick="openScenario('drift-detection')">
+                    <div class="scenario-icon">🔍</div>
+                    <div class="scenario-title">场景B: 检测配置漂移</div>
+                    <div class="scenario-description">
+                        发现并修复现网与代码的不一致。对比现网资源和 IaC 代码，可视化展示差异。
+                    </div>
+                    <span class="scenario-badge">开发阶段</span>
+                </div>
+
+                <div class="scenario-card scenario-dev" onclick="openScenario('create-from-scratch')">
+                    <div class="scenario-icon">✨</div>
+                    <div class="scenario-title">场景C: 从零创建资源</div>
+                    <div class="scenario-description">
+                        创建新的基础设施并生成代码。通过向导配置资源规格，实时预览成本和影响。
+                    </div>
+                    <span class="scenario-badge">开发阶段</span>
+                </div>
+
+                <!-- 测试部署阶段场景 -->
+                <div class="scenario-card scenario-deploy" onclick="openScenario('syntax-check')">
+                    <div class="scenario-icon">✅</div>
+                    <div class="scenario-title">场景D: IaC 语法校验</div>
+                    <div class="scenario-description">
+                        确保代码语法正确，符合规范。执行语法检查、命名规范、安全规范和最佳实践验证。
+                    </div>
+                    <span class="scenario-badge">测试部署</span>
+                </div>
+
+                <div class="scenario-card scenario-deploy" onclick="openScenario('execution-plan')">
+                    <div class="scenario-icon">📊</div>
+                    <div class="scenario-title">场景E: 创建执行计划</div>
+                    <div class="scenario-description">
+                        了解部署将产生的影响。分析变更，生成执行计划，显示依赖关系、预计耗时和风险评估。
+                    </div>
+                    <span class="scenario-badge">测试部署</span>
+                </div>
+
+                <div class="scenario-card scenario-deploy" onclick="openScenario('test-deploy')">
+                    <div class="scenario-icon">🧪</div>
+                    <div class="scenario-title">场景F: 测试部署</div>
+                    <div class="scenario-description">
+                        在测试环境验证部署。执行部署流程，实时监控状态，失败时自动回滚，生成部署报告。
+                    </div>
+                    <span class="scenario-badge">测试部署</span>
+                </div>
+
+                <div class="scenario-card scenario-deploy" onclick="openScenario('production-deploy')">
+                    <div class="scenario-icon">🚀</div>
+                    <div class="scenario-title">场景G: 生产试运行</div>
+                    <div class="scenario-description">
+                        在生产环境安全地部署。支持试运行、直接部署和金丝雀发布，分阶段监控，异常时回滚。
+                    </div>
+                    <span class="scenario-badge">测试部署</span>
+                </div>
+            </div>
+
+            <!-- 场景A: 现网资源 → IaC 代码 -->
+            <div class="scenario-view" id="scenario-reverse-engineer">
+                <div class="left-panel">
+                    <div class="panel-section">
+                        <div class="panel-title">📦 已发现资源 (8)</div>
+                    </div>
+                    <div class="resource-list" id="resource-list-reverse">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
+
+                <div class="center-panel">
+                    <div class="map-grid"></div>
+                    <div id="map-units-reverse"></div>
+                </div>
+
+                <div class="right-panel">
+                    <div class="panel-section">
+                        <div class="panel-title">⚙️ 操作</div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="simulateScan()">
+                            <span>🔍</span>
+                            <span>重新扫描</span>
+                        </button>
+                        <button class="action-btn" onclick="generateIaC()">
+                            <span>📝</span>
+                            <span>生成 IaC 代码</span>
+                        </button>
+                        <button class="action-btn primary" onclick="showModal('code-preview-modal')">
+                            <span>👁️</span>
+                            <span>预览代码</span>
+                        </button>
+                        <button class="action-btn" onclick="saveToRepo()">
+                            <span>💾</span>
+                            <span>保存到仓库</span>
+                        </button>
+                    </div>
+                    <div class="panel-section">
+                        <div class="panel-title">📊 扫描进度</div>
+                        <div style="font-size: 12px; color: #aaa; margin-top: 10px;">
+                            <div style="margin-bottom: 5px;">资源扫描</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 100%"></div>
+                            </div>
+                            <div style="margin-top: 10px; margin-bottom: 5px;">代码生成</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="code-gen-progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 场景B: 检测配置漂移 -->
+            <div class="scenario-view" id="scenario-drift-detection">
+                <div class="left-panel">
+                    <div class="panel-section">
+                        <div class="panel-title">🔍 差异统计</div>
+                    </div>
+                    <div style="padding: 15px;">
+                        <div style="margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span style="color: #aaa;">新增资源</span>
+                                <span style="color: #00ff88; font-weight: bold;">+3</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 37.5%; background: #00ff88;"></div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span style="color: #aaa;">配置变更</span>
+                                <span style="color: #feca57; font-weight: bold;">~4</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 50%; background: #feca57;"></div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span style="color: #aaa;">缺失资源</span>
+                                <span style="color: #ff6b6b; font-weight: bold;">-1</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 12.5%; background: #ff6b6b;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-section">
+                        <div class="panel-title">📋 差异列表</div>
+                    </div>
+                    <div class="resource-list" id="resource-list-drift">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
+
+                <div class="center-panel">
+                    <div class="map-grid"></div>
+                    <div id="map-units-drift"></div>
+                </div>
+
+                <div class="right-panel">
+                    <div class="panel-section">
+                        <div class="panel-title">📝 差异详情</div>
+                    </div>
+                    <div class="diff-panel" id="diff-details">
+                        <!-- 动态生成 -->
+                    </div>
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="applyDiff('auto')">
+                            <span>🤖</span>
+                            <span>自动同步</span>
+                        </button>
+                        <button class="action-btn primary" onclick="applyDiff('manual')">
+                            <span>✅</span>
+                            <span>手动确认</span>
+                        </button>
+                        <button class="action-btn danger" onclick="showModal('ignore-modal')">
+                            <span>❌</span>
+                            <span>忽略差异</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 其他场景视图可以类似方式添加 -->
+        </div>
+
+        <!-- 底部状态栏 -->
+        <div class="status-bar">
+            <div class="status-item success">● WebSocket 已连接</div>
+            <div class="status-item">📊 最后更新: 2026-04-06 10:30:15</div>
+            <div class="status-item">🔧 环境: 测试环境</div>
+            <div class="status-item">👤 用户: admin</div>
+        </div>
+    </div>
+
+    <!-- 代码预览模态框 -->
+    <div class="modal" id="code-preview-modal">
+        <div class="modal-content">
+            <div class="modal-title">📝 生成的 IaC 代码</div>
+            <div class="modal-body" style="background: #000; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto;">
+<pre style="color: #00ff88;">
+resource "huaweicloud_ads_instance" "prod_ads" {
+  name        = "production-ads"
+  flavor      = "s2.large.2"
+  count       = 3
+  network_id  = "vpc-001"
+
+  tags = {
+    Environment = "production"
+    ManagedBy   = "iac-deployment-kit"
+  }
+}
+
+resource "huaweicloud_config_configuration" "app_config" {
+  name        = "app-production-config"
+  content     = file("${path.module}/configs/prod.yaml")
+  environment = "production"
+}
+
+resource "huaweicloud_vpc" "main" {
+  name = "production-vpc"
+  cidr = "10.0.0.0/16"
+
+  tags = {
+    Environment = "production"
+  }
+}
+
+resource "huaweicloud_networking_secgroup" "web" {
+  name        = "web-secgroup"
+  description = "Security group for web servers"
+
+  tags = {
+    Purpose = "web-server"
+  }
+}
+</pre>
+            </div>
+            <div class="modal-actions">
+                <button class="action-btn" onclick="hideModal('code-preview-modal')">关闭</button>
+                <button class="action-btn primary" onclick="copyCode()">复制代码</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 场景数据
+        const scenarios = {
+            'reverse-engineer': {
+                title: '场景A: 现网资源 → IaC 代码',
+                resources: [
+                    { id: 'ads-001', type: 'ads', name: '生产ADS集群', status: 'active', x: 150, y: 150 },
+                    { id: 'vpc-001', type: 'vpc', name: '生产VPC', status: 'active', x: 300, y: 150 },
+                    { id: 'sg-001', type: 'security_group', name: 'Web安全组', status: 'active', x: 450, y: 150 },
+                    { id: 'lb-001', type: 'load_balancer', name: '公网负载均衡', status: 'active', x: 300, y: 300 },
+                    { id: 'db-001', type: 'database', name: '主数据库', status: 'active', x: 150, y: 300 },
+                    { id: 'cache-001', type: 'cache', name: 'Redis缓存', status: 'active', x: 450, y: 300 }
+                ]
+            },
+            'drift-detection': {
+                title: '场景B: 检测配置漂移',
+                resources: [
+                    { id: 'ads-001', type: 'ads', name: '生产ADS集群', status: 'changed', x: 150, y: 150 },
+                    { id: 'vpc-001', type: 'vpc', name: '生产VPC', status: 'active', x: 300, y: 150 },
+                    { id: 'sg-002', type: 'security_group', name: 'API安全组', status: 'added', x: 450, y: 150 },
+                    { id: 'lb-001', type: 'load_balancer', name: '公网负载均衡', status: 'changed', x: 300, y: 300 },
+                    { id: 'cache-002', type: 'cache', name: '新Redis节点', status: 'added', x: 450, y: 300 },
+                    { id: 'db-old', type: 'database', name: '旧数据库', status: 'removed', x: 150, y: 300 }
+                ]
+            }
+        };
+
+        const RESOURCE_TYPES = {
+            'ads': { icon: '🏢', color: '#3498db', label: 'ADS集群' },
+            'config': { icon: '⚙️', color: '#f39c12', label: '配置' },
+            'vpc': { icon: '🌐', color: '#9b59b6', label: 'VPC' },
+            'security_group': { icon: '🛡️', color: '#e74c3c', label: '安全组' },
+            'load_balancer': { icon: '⚖️', color: '#1abc9c', label: '负载均衡' },
+            'database': { icon: '🗄️', color: '#e67e22', label: '数据库' },
+            'cache': { icon: '💾', color: '#16a085', label: '缓存' }
+        };
+
+        // 显示场景选择页面
+        function showScenarioSelection() {
+            document.querySelectorAll('.scenario-view').forEach(view => {
+                view.classList.remove('active');
+            });
+            document.getElementById('scenario-selection').style.display = 'grid';
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            document.querySelector('.nav-link').classList.add('active');
+        }
+
+        // 打开场景
+        function openScenario(scenarioId) {
+            document.getElementById('scenario-selection').style.display = 'none';
+            document.querySelectorAll('.scenario-view').forEach(view => {
+                view.classList.remove('active');
+            });
+
+            const scenario = scenarios[scenarioId];
+            if (scenario) {
+                const view = document.getElementById(`scenario-${scenarioId}`);
+                if (view) {
+                    view.classList.add('active');
+                    renderScenario(scenarioId, scenario);
+                } else {
+                    alert('该场景正在开发中...');
+                    showScenarioSelection();
+                }
+            }
+        }
+
+        // 渲染场景
+        function renderScenario(scenarioId, scenario) {
+            if (scenarioId === 'reverse-engineer') {
+                renderReverseEngineer(scenario);
+            } else if (scenarioId === 'drift-detection') {
+                renderDriftDetection(scenario);
+            }
+        }
+
+        // 渲染场景A: 反向工程
+        function renderReverseEngineer(scenario) {
+            // 渲染资源列表
+            const resourceList = document.getElementById('resource-list-reverse');
+            resourceList.innerHTML = scenario.resources.map(resource => {
+                const type = RESOURCE_TYPES[resource.type];
+                return `
+                    <div class="resource-item" onclick="selectResource('${resource.id}')">
+                        <div class="resource-item-icon">${type.icon}</div>
+                        <div class="resource-item-name">${resource.name}</div>
+                        <div class="resource-item-status">${type.label} · 运行中</div>
+                    </div>
+                `;
+            }).join('');
+
+            // 渲染地图
+            renderMapUnits('map-units-reverse', scenario.resources);
+        }
+
+        // 渲染场景B: 漂移检测
+        function renderDriftDetection(scenario) {
+            // 渲染资源列表
+            const resourceList = document.getElementById('resource-list-drift');
+            const statusMap = {
+                'added': { label: '新增', class: 'added', color: '#00ff88' },
+                'changed': { label: '变更', class: 'changed', color: '#feca57' },
+                'removed': { label: '缺失', class: 'removed', color: '#ff6b6b' },
+                'active': { label: '一致', class: 'active', color: '#00d9ff' }
+            };
+
+            resourceList.innerHTML = scenario.resources.map(resource => {
+                const type = RESOURCE_TYPES[resource.type];
+                const status = statusMap[resource.status];
+                return `
+                    <div class="resource-item" onclick="showDiffDetails('${resource.id}')">
+                        <div class="resource-item-icon">${type.icon}</div>
+                        <div class="resource-item-name">${resource.name}</div>
+                        <div class="resource-item-status">
+                            <span style="color: ${status.color};">${status.label}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // 渲染地图
+            renderMapUnits('map-units-drift', scenario.resources);
+
+            // 渲染默认差异详情
+            showDiffDetails('ads-001');
+        }
+
+        // 渲染地图单位
+        function renderMapUnits(containerId, resources) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = resources.map(resource => {
+                const type = RESOURCE_TYPES[resource.type];
+                const statusClass = resource.status === 'added' || resource.status === 'changed' || resource.status === 'removed'
+                    ? resource.status
+                    : '';
+
+                return `
+                    <div class="map-unit" style="left: ${resource.x}px; top: ${resource.y}px; color: ${type.color};"
+                         onclick="handleUnitClick('${resource.id}')">
+                        <div class="map-unit-icon">${type.icon}</div>
+                        <div class="map-unit-label">${resource.name}</div>
+                        ${statusClass ? `<div class="map-unit-status ${statusClass}"></div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 显示差异详情
+        function showDiffDetails(resourceId) {
+            const diffDetails = document.getElementById('diff-details');
+            const diffs = {
+                'ads-001': {
+                    name: '生产ADS集群',
+                    status: 'changed',
+                    changes: [
+                        { field: 'flavor', old: 's2.large.2', new: 's2.xlarge.4' },
+                        { field: 'count', old: '2', new: '3' },
+                        { field: 'volume_size', old: '100', new: '200' }
+                    ]
+                },
+                'lb-001': {
+                    name: '公网负载均衡',
+                    status: 'changed',
+                    changes: [
+                        { field: 'bandwidth', old: '10', new: '20' },
+                        { field: 'l4_flavor', old: 'Small', new: 'Medium' }
+                    ]
+                },
+                'sg-002': {
+                    name: 'API安全组',
+                    status: 'added',
+                    changes: [
+                        { field: 'name', old: null, new: 'api-secgroup' },
+                        { field: 'description', old: null, new: 'Security group for API servers' }
+                    ]
+                },
+                'cache-002': {
+                    name: '新Redis节点',
+                    status: 'added',
+                    changes: [
+                        { field: 'engine_version', old: null, new: '6.0' },
+                        { field: 'capacity', old: null, new: '4' }
+                    ]
+                },
+                'db-old': {
+                    name: '旧数据库',
+                    status: 'removed',
+                    changes: [
+                        { field: 'instance_id', old: 'db-old-001', new: null },
+                        { field: 'flavor', old: 's2.large.4', new: null }
+                    ]
+                }
+            };
+
+            const diff = diffs[resourceId] || {
+                name: '未知资源',
+                status: 'active',
+                changes: []
+            };
+
+            const statusBadge = {
+                'added': { text: '新增', class: 'added' },
+                'changed': { text: '变更', class: 'changed' },
+                'removed': { text: '删除', class: 'removed' },
+                'active': { text: '一致', class: 'active' }
+            };
+
+            const badge = statusBadge[diff.status];
+
+            diffDetails.innerHTML = `
+                <div class="diff-item">
+                    <div class="diff-item-header">
+                        <span class="diff-item-badge ${badge.class}">${badge.text}</span>
+                        <span style="color: #fff; font-weight: bold;">${diff.name}</span>
+                    </div>
+                    ${diff.changes.map(change => `
+                        <div class="diff-item-field">
+                            <span class="diff-field-name">${change.field}:</span>
+                            ${change.old ? `<span class="diff-field-old">${change.old}</span>` : '<span style="color: #666;">-</span>'}
+                            <span style="color: #666;">→</span>
+                            ${change.new ? `<span class="diff-field-new">${change.new}</span>` : '<span style="color: #666;">-</span>'}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // 选择资源
+        function selectResource(resourceId) {
+            console.log('Selected resource:', resourceId);
+        }
+
+        // 处理地图单位点击
+        function handleUnitClick(resourceId) {
+            console.log('Clicked unit:', resourceId);
+        }
+
+        // 模拟扫描
+        function simulateScan() {
+            alert('正在重新扫描现网资源...');
+        }
+
+        // 生成 IaC 代码
+        function generateIaC() {
+            const progress = document.getElementById('code-gen-progress');
+            let p = 0;
+            const interval = setInterval(() => {
+                p += 10;
+                progress.style.width = p + '%';
+                if (p >= 100) {
+                    clearInterval(interval);
+                    alert('IaC 代码生成完成！');
+                }
+            }, 200);
+        }
+
+        // 保存到仓库
+        function saveToRepo() {
+            alert('代码已保存到仓库！');
+        }
+
+        // 应用差异
+        function applyDiff(mode) {
+            if (mode === 'auto') {
+                alert('自动同步所有差异到 IaC 代码...');
+            } else {
+                alert('进入手动确认模式...');
+            }
+        }
+
+        // 复制代码
+        function copyCode() {
+            alert('代码已复制到剪贴板');
+            hideModal('code-preview-modal');
+        }
+
+        // 显示模态框
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        // 隐藏模态框
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // 初始化
+        window.onload = function() {
+            console.log('IaC Deployment Management UI loaded');
+        };
+    </script>
+</body>
+</html>
