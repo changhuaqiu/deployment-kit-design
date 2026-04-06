@@ -76,6 +76,7 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   }
 
   const handleBuildingPositionChange = (buildingId: string, x: number, y: number) => {
+    console.log('📦 Building position change:', buildingId, '→', x, y)
     setBuildings(prevBuildings =>
       prevBuildings.map(building =>
         building.id === buildingId

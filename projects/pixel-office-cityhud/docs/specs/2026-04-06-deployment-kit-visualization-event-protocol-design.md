@@ -408,6 +408,16 @@ type DeployKitEvent =
   - `dk events --follow`
   - `skill_progress`
 
+## Sync Checklist For Deployment Kit
+
+- emit `scenario_detected`
+- emit `workflow_selected`
+- emit `skill_started`
+- emit `skill_completed`
+- emit `approval_required`
+- emit `workflow_completed`
+- forward `stdout JSONL` to `POST /deploykit/ingest` when validating in the local visualization environment
+
 ## Success Criteria
 
 - `Deployment Kit` 可以输出稳定的 stdout JSONL 业务事件

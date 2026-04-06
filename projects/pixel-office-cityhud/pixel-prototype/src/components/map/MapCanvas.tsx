@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import type { Building, Connection, ZoomLevel, SelectionState, ViewportState, HoverState } from '@/types/map'
 import { getZoomScale } from '@/types/map'
 import { mapToScreen, screenToMap, pointInRect } from '@/utils/mapCoordinates'
 import { drawBuilding, drawConnection } from '@/utils/mapRendering'
 import { calculateAgentPath } from '@/utils/agentPathfinding'
+import { cullBuildingsToViewport } from '@/utils/mapOptimization'
 import type { Agent } from '@/types/agents'
 import type { WorkerAgent } from '@/store/agents'
 import { AgentRenderer } from './AgentRenderer'
@@ -23,6 +24,7 @@ interface MapCanvasProps {
   onZoomChange: (zoom: ZoomLevel) => void
   onHoverChange: (hovered: HoverState) => void
   onMousePositionChange?: (position: { x: number; y: number }) => void
+  onBuildingPositionChange?: (buildingId: string, x: number, y: number) => void
 }
 
 export function MapCanvas({
@@ -38,23 +40,32 @@ export function MapCanvas({
   onAgentClick,
   onViewportChange,
   onZoomChange,
-  onHoverChange
+  onHoverChange,
+  onMousePositionChange,
+  onBuildingPositionChange
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const dragStateRef = useRef<{
     isDragging: boolean
+    isDraggingBuilding: boolean
+    draggedBuildingId: string | null
     startX: number
     startY: number
     viewportStartX: number
     viewportStartY: number
+    buildingStartX: number
+    buildingStartY: number
     totalDistance: number
   }>({
     isDragging: false,
+    isDraggingBuilding: false,
+    draggedBuildingId: null,
     startX: 0,
     startY: 0,
     viewportStartX: 0,
     viewportStartY: 0,
+    buildingStartX: 0,
+    buildingStartY: 0,
     totalDistance: 0
   })
 
@@ -195,7 +206,8 @@ export function MapCanvas({
     })
 
     // Draw buildings
-    buildings.forEach((building) => {
+    const visibleBuildings = cullBuildingsToViewport(buildings, viewport, zoom, canvas.width, canvas.height)
+    visibleBuildings.forEach((building) => {
       const screenPos = mapToScreen(
         building.position.x,
         building.position.y,
@@ -205,16 +217,6 @@ export function MapCanvas({
 
       const width = building.position.width * zoomScale
       const height = building.position.height * zoomScale
-
-      // Check if visible
-      if (
-        screenPos.x + width < 0 ||
-        screenPos.x > canvas.width ||
-        screenPos.y + height < 0 ||
-        screenPos.y > canvas.height
-      ) {
-        return
-      }
 
       // Draw hover highlight
       if (hovered.type === 'building' && hovered.id === building.id) {
@@ -329,16 +331,54 @@ export function MapCanvas({
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
 
+      // Check if clicking on a building
+      const mapPos = screenToMap(x, y, viewport, zoomScale)
+      let clickedBuildingId: string | null = null
+
+      for (const building of buildings) {
+        if (pointInRect(mapPos, building.position)) {
+          clickedBuildingId = building.id
+          console.log('🏢 Clicked building:', building.name, building.id)
+          break
+        }
+      }
+
+      if (clickedBuildingId && onBuildingPositionChange) {
+        // Start dragging building
+        const building = buildings.find(b => b.id === clickedBuildingId)
+        if (building) {
+          console.log('✋ Starting to drag building:', building.name)
+          dragStateRef.current = {
+            isDragging: true,
+            isDraggingBuilding: true,
+            draggedBuildingId: clickedBuildingId,
+            startX: x,
+            startY: y,
+            viewportStartX: viewport.x,
+            viewportStartY: viewport.y,
+            buildingStartX: building.position.x,
+            buildingStartY: building.position.y,
+            totalDistance: 0
+          }
+          return
+        }
+      }
+
+      // Otherwise, start dragging viewport
       dragStateRef.current = {
         isDragging: true,
+        isDraggingBuilding: false,
+        draggedBuildingId: null,
         startX: x,
         startY: y,
         viewportStartX: viewport.x,
         viewportStartY: viewport.y,
+        buildingStartX: 0,
+        buildingStartY: 0,
         totalDistance: 0
       }
     },
-    [viewport]
+    [viewport, zoomScale, buildings, onBuildingPositionChange]
   )
 
   // Mouse move handler
@@ -351,7 +391,10 @@ export function MapCanvas({
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
 
-      setMousePosition({ x: e.clientX, y: e.clientY })
+      // Update mouse position if callback provided
+      if (onMousePositionChange) {
+        onMousePositionChange({ x: e.clientX, y: e.clientY })
+      }
 
       if (!dragStateRef.current.isDragging) {
         // Perform hover detection when not dragging
@@ -367,12 +410,22 @@ export function MapCanvas({
 
       dragStateRef.current.totalDistance += Math.sqrt(dx * dx + dy * dy)
 
+      // Handle building dragging
+      if (dragStateRef.current.isDraggingBuilding && dragStateRef.current.draggedBuildingId) {
+        const newBuildingX = dragStateRef.current.buildingStartX + dx / zoomScale
+        const newBuildingY = dragStateRef.current.buildingStartY + dy / zoomScale
+        console.log('🚚 Moving building to:', newBuildingX, newBuildingY)
+        onBuildingPositionChange?.(dragStateRef.current.draggedBuildingId, newBuildingX, newBuildingY)
+        return
+      }
+
+      // Handle viewport dragging
       const newViewportX = dragStateRef.current.viewportStartX - dx / zoomScale
       const newViewportY = dragStateRef.current.viewportStartY - dy / zoomScale
 
       onViewportChange({ x: newViewportX, y: newViewportY })
     },
-    [zoomScale, onViewportChange, hovered, onHoverChange]
+    [zoomScale, onViewportChange, hovered, onHoverChange, onMousePositionChange, onBuildingPositionChange]
   )
 
   // Mouse leave handler
@@ -380,8 +433,10 @@ export function MapCanvas({
     if (hovered.type !== null || hovered.id !== null) {
       onHoverChange({ type: null, id: null })
     }
-    // Also handle drag state
+    // Reset drag state
     dragStateRef.current.isDragging = false
+    dragStateRef.current.isDraggingBuilding = false
+    dragStateRef.current.draggedBuildingId = null
   }, [hovered, onHoverChange])
 
   // Mouse up handler
@@ -396,7 +451,7 @@ export function MapCanvas({
 
       // Check if this was a click (not a drag)
       const DRAG_THRESHOLD = 5
-      if (dragStateRef.current.totalDistance < DRAG_THRESHOLD) {
+      if (dragStateRef.current.totalDistance < DRAG_THRESHOLD && !dragStateRef.current.isDraggingBuilding) {
         const mapPos = screenToMap(x, y, viewport, zoomScale)
 
         // Check building clicks
@@ -404,6 +459,8 @@ export function MapCanvas({
           if (pointInRect(mapPos, building.position)) {
             onBuildingClick(building.id)
             dragStateRef.current.isDragging = false
+            dragStateRef.current.isDraggingBuilding = false
+            dragStateRef.current.draggedBuildingId = null
             return
           }
         }
@@ -423,7 +480,10 @@ export function MapCanvas({
         }
       }
 
+      // Reset all drag state
       dragStateRef.current.isDragging = false
+      dragStateRef.current.isDraggingBuilding = false
+      dragStateRef.current.draggedBuildingId = null
     },
     [buildings, agents, viewport, zoomScale, onBuildingClick, onAgentClick]
   )

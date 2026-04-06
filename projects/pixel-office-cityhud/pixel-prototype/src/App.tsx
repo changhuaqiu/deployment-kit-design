@@ -12,7 +12,7 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/map" element={<Map />} />
+        <Route path="/map" element={<CityMapComplete />} />
         <Route path="/map/:env" element={<CityMapComplete />} />
         <Route path="/districts/:env" element={<Districts />} />
         <Route path="/workshop/:id" element={<Workshop />} />

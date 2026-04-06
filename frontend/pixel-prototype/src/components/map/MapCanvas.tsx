@@ -338,6 +338,7 @@ export function MapCanvas({
       for (const building of buildings) {
         if (pointInRect(mapPos, building.position)) {
           clickedBuildingId = building.id
+          console.log('🏢 Clicked building:', building.name, building.id)
           break
         }
       }
@@ -346,6 +347,7 @@ export function MapCanvas({
         // Start dragging building
         const building = buildings.find(b => b.id === clickedBuildingId)
         if (building) {
+          console.log('✋ Starting to drag building:', building.name)
           dragStateRef.current = {
             isDragging: true,
             isDraggingBuilding: true,
@@ -412,6 +414,7 @@ export function MapCanvas({
       if (dragStateRef.current.isDraggingBuilding && dragStateRef.current.draggedBuildingId) {
         const newBuildingX = dragStateRef.current.buildingStartX + dx / zoomScale
         const newBuildingY = dragStateRef.current.buildingStartY + dy / zoomScale
+        console.log('🚚 Moving building to:', newBuildingX, newBuildingY)
         onBuildingPositionChange?.(dragStateRef.current.draggedBuildingId, newBuildingX, newBuildingY)
         return
       }
