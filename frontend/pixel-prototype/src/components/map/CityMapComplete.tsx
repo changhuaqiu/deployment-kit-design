@@ -57,10 +57,10 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   const agentList = Object.values(agents)
 
-  // Define some example connections
+  // Define some example connections using actual building IDs
   const connections = [
-    { from: 'test-compute', to: 'test-data', type: 'dependency' as const },
-    { from: 'test-compute', to: 'test-network', type: 'dataflow' as const }
+    { from: 'data-center', to: 'compute-node', type: 'dependency' as const },
+    { from: 'compute-node', to: 'network-gateway', type: 'dataflow' as const }
   ]
 
   const handleBuildingClick = (buildingId: string) => {
@@ -73,6 +73,16 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   const handleHoverChange = (hoveredState: { type: 'building' | 'agent' | null; id: string | null }) => {
     setHovered(hoveredState)
+  }
+
+  const handleBuildingPositionChange = (buildingId: string, x: number, y: number) => {
+    setBuildings(prevBuildings =>
+      prevBuildings.map(building =>
+        building.id === buildingId
+          ? { ...building, position: { ...building.position, x, y } }
+          : building
+      )
+    )
   }
 
   return (
@@ -104,6 +114,7 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
           onZoomChange={setZoom}
           onHoverChange={handleHoverChange}
           onMousePositionChange={setMousePosition}
+          onBuildingPositionChange={handleBuildingPositionChange}
         />
 
       {/* Tooltip */}
