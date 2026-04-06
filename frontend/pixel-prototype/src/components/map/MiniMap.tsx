@@ -1,6 +1,5 @@
 import { useRef, useEffect } from 'react'
-import type { Building } from '@/types/map'
-import type { ViewportState, ZoomLevel } from '@/store/mapStore'
+import type { Building, ViewportState, ZoomLevel } from '@/types/map'
 import { getZoomScale } from '@/types/map'
 
 interface MiniMapProps {
