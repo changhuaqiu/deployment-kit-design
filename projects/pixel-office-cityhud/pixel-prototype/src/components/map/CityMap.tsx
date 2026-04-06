@@ -70,17 +70,20 @@ export function CityMap() {
   const mapHeight = 400
 
   return (
-    <div className="relative w-full h-full bg-[#0a0f18] overflow-hidden">
+    <div
+      className="relative w-full h-full overflow-hidden"
+      style={{ backgroundColor: '#1a1a2e' }}
+    >
       {/* Background grid */}
       <div className="absolute inset-0 opacity-10">
         <div
           className="w-full h-full"
           style={{
             backgroundImage: `
-              linear-gradient(to right, #1e293b 1px, transparent 1px),
-              linear-gradient(to bottom, #1e293b 1px, transparent 1px)
+              linear-gradient(to right, #3b82f6 1px, transparent 1px),
+              linear-gradient(to bottom, #3b82f6 1px, transparent 1px)
             `,
-            backgroundSize: '20px 20px'
+            backgroundSize: '32px 32px'
           }}
         />
       </div>
