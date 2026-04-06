@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { MapCanvas } from './MapCanvas'
 import { MapControls } from './MapControls'
+import { BuildingDetailPanel } from './BuildingDetailPanel'
+import { Tooltip } from './Tooltip'
 import AgentOfficePanel from '../city/AgentOfficePanel'
 import { DistrictType, AgentRole } from '@/types/agents'
 import { useAgentStore } from '@/store/agents'
 import { useDistrictStore } from '@/store/districts'
-import { useMapStore, type HoverState } from '@/store/mapStore'
+import { useMapStore } from '@/store/mapStore'
 import { districtsToBuildings } from '@/utils/mapRendering'
 
 /**
@@ -27,6 +29,7 @@ export function CityMapComplete() {
   const setHovered = useMapStore((state) => state.setHovered)
 
   const [buildings, setBuildings] = useState<ReturnType<typeof districtsToBuildings>>([])
+const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   // Initialize all districts for test and prod
   useEffect(() => {
@@ -69,6 +72,10 @@ export function CityMapComplete() {
     setSelection({ type: 'agent', id: agentId })
   }
 
+  const handleHoverChange = (hoveredState: { type: 'building' | 'agent' | null; id: string | null }) => {
+    setHovered(hoveredState)
+  }
+
   return (
     <div style={{
       width: '100vw',
@@ -95,8 +102,29 @@ export function CityMapComplete() {
           onAgentClick={handleAgentClick}
           onViewportChange={setViewport}
           onZoomChange={setZoom}
-          onHoverChange={setHovered}
+          onHoverChange={handleHoverChange}
+          onMousePositionChange={setMousePosition}
         />
+
+      {/* Tooltip */}
+      {hovered.type && hovered.id && (
+        <Tooltip
+          type={hovered.type}
+          target={hovered.type === 'building'
+            ? buildings.find(b => b.id === hovered.id)
+            : agents.find(a => a.id === hovered.id)
+          }
+          position={mousePosition}
+        />
+      )}
+
+      {/* BuildingDetailPanel */}
+      {selection.type === 'building' && selection.id && (
+        <BuildingDetailPanel
+          buildingId={selection.id}
+          onClose={() => setSelection({ type: null, id: null })}
+        />
+      )}
 
       {/* NEW: MapControls overlay */}
       <MapControls buildings={buildings} />
