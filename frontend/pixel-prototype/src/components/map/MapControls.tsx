@@ -1,6 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { useMapStore, PRESET_VIEWPORTS } from '@/store/mapStore'
 import { MiniMap } from './MiniMap'
-import { animateZoomTransition } from '@/utils/mapAnimations'
+import { animateZoomTransition, cancelCurrentAnimation } from '@/utils/mapAnimations'
 import type { ZoomLevel, Building } from '@/types/map'
 
 export function getNextZoomLevel(current: ZoomLevel): ZoomLevel {
@@ -26,27 +27,44 @@ export function MapControls({ buildings = [] }: MapControlsProps) {
   const setZoom = useMapStore((s) => s.setZoom)
   const resetView = useMapStore((s) => s.resetView)
 
+  // Ref to track current animation frame
+  const animationFrameRef = useRef<number>()
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+      cancelCurrentAnimation()
+    }
+  }, [])
+
   const handleZoomIn = () => {
     const nextZoom = getNextZoomLevel(zoom)
 
     if (nextZoom !== zoom) {
-      const startTime = performance.now()
+      // Cancel previous animation
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+
       const anim = animateZoomTransition({ ...viewport, zoom }, nextZoom, 2000)
 
-      let frameId: number
       const frame = (time: number) => {
         const continueAnimation = anim(time, (newViewport) => {
           setViewport(newViewport)
         })
 
         if (continueAnimation) {
-          frameId = requestAnimationFrame(frame)
+          animationFrameRef.current = requestAnimationFrame(frame)
         } else {
-          setZoom(nextZoom)  // Final zoom level
+          animationFrameRef.current = undefined
+          setZoom(nextZoom)
         }
       }
 
-      frameId = requestAnimationFrame(frame)
+      animationFrameRef.current = requestAnimationFrame(frame)
     }
   }
 
@@ -54,23 +72,27 @@ export function MapControls({ buildings = [] }: MapControlsProps) {
     const prevZoom = getPrevZoomLevel(zoom)
 
     if (prevZoom !== zoom) {
-      const startTime = performance.now()
+      // Cancel previous animation
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+
       const anim = animateZoomTransition({ ...viewport, zoom }, prevZoom, 2000)
 
-      let frameId: number
       const frame = (time: number) => {
         const continueAnimation = anim(time, (newViewport) => {
           setViewport(newViewport)
         })
 
         if (continueAnimation) {
-          frameId = requestAnimationFrame(frame)
+          animationFrameRef.current = requestAnimationFrame(frame)
         } else {
+          animationFrameRef.current = undefined
           setZoom(prevZoom)
         }
       }
 
-      frameId = requestAnimationFrame(frame)
+      animationFrameRef.current = requestAnimationFrame(frame)
     }
   }
 
@@ -121,26 +143,45 @@ export function MapControls({ buildings = [] }: MapControlsProps) {
         bottom: 10,
         left: 10,
         display: 'flex',
+        flexDirection: 'column',
         gap: '8px',
-        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-        padding: '12px',
-        borderRadius: '8px',
-        border: '1px solid #8b5cf6'
       }}>
-        <button onClick={() => handlePreset('test')} style={{
-          padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
-          backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px'
-        }}>Test</button>
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          padding: '12px',
+          borderRadius: '8px',
+          border: '1px solid #8b5cf6'
+        }}>
+          <button onClick={() => handlePreset('test')} style={{
+            padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
+            backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px'
+          }}>Test</button>
 
-        <button onClick={() => handlePreset('prod')} style={{
-          padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
-          backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px'
-        }}>Prod</button>
+          <button onClick={() => handlePreset('prod')} style={{
+            padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
+            backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px'
+          }}>Prod</button>
 
-        <button onClick={() => handlePreset('all')} style={{
-          padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
-          backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px'
-        }}>All</button>
+          <button onClick={() => handlePreset('all')} style={{
+            padding: '8px 16px', fontSize: '14px', cursor: 'pointer',
+            backgroundColor: '#f59e0b', color: '#fff', border: 'none', borderRadius: '4px'
+          }}>All</button>
+        </div>
+
+        <div style={{
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          border: '1px solid #8b5cf6',
+          color: '#9ca3af',
+          fontSize: '11px',
+          fontFamily: 'monospace',
+          whiteSpace: 'nowrap'
+        }}>
+          Shortcuts: +/- zoom | Arrows pan | Esc clear | 1/2/3 presets
+        </div>
       </div>
     </>
   )

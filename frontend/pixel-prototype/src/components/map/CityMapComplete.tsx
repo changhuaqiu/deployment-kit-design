@@ -10,6 +10,7 @@ import { useDistrictStore } from '@/store/districts'
 import { useMapStore } from '@/store/mapStore'
 import { useDeployStore } from '@/store/deployStore'
 import { districtsToBuildings } from '@/utils/mapRendering'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import type { WorkerAgent } from '@/store/agents'
 
 /**
@@ -33,6 +34,9 @@ export function CityMapComplete() {
 
   const [buildings, setBuildings] = useState<ReturnType<typeof districtsToBuildings>>([])
 const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+
+  // Initialize keyboard shortcuts
+  useKeyboardShortcuts(viewport, zoom, selection)
 
   // Initialize all districts for test and prod
   useEffect(() => {
