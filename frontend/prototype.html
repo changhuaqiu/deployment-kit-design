@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infrastructure Deployment - Strategy Game View</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            grid-template-rows: 60px 1fr 200px;
+            height: 100vh;
+            gap: 2px;
+            background: #0f0f1e;
+        }
+
+        /* 顶部状态栏 */
+        .header {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            border-bottom: 2px solid #00d9ff;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 20px;
+            box-shadow: 0 2px 10px rgba(0, 217, 255, 0.3);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+
+        .deployment-status {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .progress-container {
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .progress-label {
+            font-size: 12px;
+            color: #00d9ff;
+            margin-bottom: 5px;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background: #0a0a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid #00d9ff;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .current-skill {
+            background: rgba(0, 217, 255, 0.1);
+            padding: 5px 15px;
+            border-radius: 15px;
+            border: 1px solid #00d9ff;
+            font-size: 13px;
+        }
+
+        /* 游戏地图 */
+        .game-map {
+            background: #0a0a1a;
+            position: relative;
+            overflow: hidden;
+            border-right: 2px solid #00d9ff;
+        }
+
+        .map-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(0, 217, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 217, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        .unit {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            animation: unitSpawn 0.5s ease;
+        }
+
+        @keyframes unitSpawn {
+            0% {
+                transform: scale(0) rotate(180deg);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.2) rotate(0deg);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .unit-icon {
+            font-size: 48px;
+            filter: drop-shadow(0 0 10px currentColor);
+            position: relative;
+        }
+
+        .unit-building .unit-icon::after {
+            content: '🔨';
+            position: absolute;
+            font-size: 20px;
+            top: -5px;
+            right: -5px;
+            animation: hammer 0.5s infinite;
+        }
+
+        @keyframes hammer {
+            0%, 100% { transform: rotate(-20deg); }
+            50% { transform: rotate(20deg); }
+        }
+
+        .unit-label {
+            font-size: 11px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-top: 5px;
+            white-space: nowrap;
+        }
+
+        .unit-progress {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 6px;
+            background: #0a0a1a;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .unit-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #feca57);
+            transition: width 0.3s ease;
+        }
+
+        .unit-status-added {
+            animation: glowGreen 2s infinite;
+        }
+
+        @keyframes glowGreen {
+            0%, 100% { filter: drop-shadow(0 0 10px #00ff88); }
+            50% { filter: drop-shadow(0 0 20px #00ff88); }
+        }
+
+        .unit-status-removed {
+            opacity: 0.3;
+            filter: grayscale(100%);
+            animation: demolition 1s forwards;
+        }
+
+        @keyframes demolition {
+            0% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.3); opacity: 0.8; background: rgba(255, 0, 0, 0.3); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        .unit-status-changed {
+            animation: glowYellow 2s infinite;
+        }
+
+        @keyframes glowYellow {
+            0%, 100% { filter: drop-shadow(0 0 10px #feca57); }
+            50% { filter: drop-shadow(0 0 20px #feca57); }
+        }
+
+        /* 右侧面板 */
+        .sidebar {
+            background: #0f0f1e;
+            border-left: 2px solid #00d9ff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-section {
+            padding: 15px;
+            border-bottom: 1px solid #00d9ff;
+        }
+
+        .sidebar-title {
+            font-size: 14px;
+            color: #00d9ff;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .unit-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .unit-list-item {
+            background: rgba(0, 217, 255, 0.05);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .unit-list-item:hover {
+            background: rgba(0, 217, 255, 0.1);
+            border-color: #00d9ff;
+            transform: translateX(5px);
+        }
+
+        .unit-list-item.building {
+            border-color: #feca57;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .unit-list-item-icon {
+            font-size: 24px;
+        }
+
+        .unit-list-item-info {
+            flex: 1;
+        }
+
+        .unit-list-item-name {
+            font-size: 13px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .unit-list-item-status {
+            font-size: 11px;
+            color: #00d9ff;
+        }
+
+        .unit-list-item-badge {
+            background: #00ff88;
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .unit-list-item-badge.added {
+            background: #00ff88;
+        }
+
+        .unit-list-item-badge.changed {
+            background: #feca57;
+        }
+
+        .unit-list-item-badge.removed {
+            background: #ff6b6b;
+        }
+
+        /* 底部事件日志 */
+        .event-log {
+            grid-column: 1 / -1;
+            background: #0a0a1a;
+            border-top: 2px solid #00d9ff;
+            padding: 10px 15px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .event-log-title {
+            color: #00d9ff;
+            font-size: 12px;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        .event-item {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(0, 217, 255, 0.1);
+            display: flex;
+            gap: 10px;
+        }
+
+        .event-time {
+            color: #666;
+            min-width: 80px;
+        }
+
+        .event-type {
+            font-weight: bold;
+            min-width: 100px;
+        }
+
+        .event-type.started { color: #feca57; }
+        .event-type.progress { color: #00d9ff; }
+        .event-type.completed { color: #00ff88; }
+        .event-type.failed { color: #ff6b6b; }
+
+        .event-message {
+            color: #ccc;
+            flex: 1;
+        }
+
+        /* 统计信息 */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding: 10px;
+        }
+
+        .stat-item {
+            background: rgba(0, 217, 255, 0.05);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #00d9ff;
+            margin-top: 5px;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #00d9ff;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ff88;
+        }
+
+        /* 小地图 */
+        .minimap {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 200px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00d9ff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .minimap-title {
+            font-size: 10px;
+            color: #00d9ff;
+            padding: 5px;
+            background: rgba(0, 217, 255, 0.1);
+            text-align: center;
+        }
+
+        .minimap-content {
+            position: relative;
+            height: calc(100% - 24px);
+        }
+
+        .minimap-unit {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00ff88;
+            box-shadow: 0 0 5px currentColor;
+        }
+
+        /* 控制按钮 */
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            background: rgba(0, 217, 255, 0.2);
+            border: 1px solid #00d9ff;
+            color: #00d9ff;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: #00d9ff;
+            color: #000;
+        }
+
+        .control-btn.active {
+            background: #00ff88;
+            border-color: #00ff88;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- 顶部状态栏 -->
+        <div class="header">
+            <h1>🎮 Infrastructure Deployment</h1>
+            <div class="deployment-status">
+                <div class="progress-container">
+                    <div class="progress-label">部署进度</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill" style="width: 0%;">0%</div>
+                    </div>
+                </div>
+                <div class="current-skill" id="current-skill">等待开始...</div>
+            </div>
+        </div>
+
+        <!-- 游戏地图 -->
+        <div class="game-map" id="game-map">
+            <div class="map-grid"></div>
+
+            <!-- 控制按钮 -->
+            <div class="controls">
+                <button class="control-btn" onclick="toggleSimulation()">▶️ 开始模拟</button>
+                <button class="control-btn" onclick="resetSimulation()">🔄 重置</button>
+                <button class="control-btn" onclick="showDiffMode()">🔍 对比模式</button>
+            </div>
+
+            <!-- 小地图 -->
+            <div class="minimap">
+                <div class="minimap-title">MINIMAP</div>
+                <div class="minimap-content" id="minimap-content"></div>
+            </div>
+        </div>
+
+        <!-- 右侧面板 -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">📊 统计信息</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-total">0</div>
+                        <div class="stat-label">总计</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-active">0</div>
+                        <div class="stat-label">活跃</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-building">0</div>
+                        <div class="stat-label">构建中</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="stat-failed">0</div>
+                        <div class="stat-label">失败</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="sidebar-title">🏗️ 基础设施列表</div>
+                <div class="unit-list" id="unit-list"></div>
+            </div>
+        </div>
+
+        <!-- 底部事件日志 -->
+        <div class="event-log">
+            <div class="event-log-title">📋 部署日志</div>
+            <div id="event-log-content"></div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟数据：基础设施资源类型
+        const RESOURCE_TYPES = {
+            'ads': { icon: '🏢', color: '#3498db', label: 'ADS集群' },
+            'config': { icon: '⚙️', color: '#f39c12', label: '配置' },
+            'vpc': { icon: '🌐', color: '#9b59b6', label: 'VPC网络' },
+            'security_group': { icon: '🛡️', color: '#e74c3c', label: '安全组' },
+            'load_balancer': { icon: '⚖️', color: '#1abc9c', label: '负载均衡' },
+            'database': { icon: '🗄️', color: '#e67e22', label: '数据库' },
+            'cache': { icon: '💾', color: '#16a085', label: '缓存' }
+        };
+
+        // 模拟部署流程
+        let simulationRunning = false;
+        let currentStep = 0;
+        let units = [];
+
+        const DEPLOYMENT_STEPS = [
+            { type: 'workflow_started', message: '开始部署工作流', skill: 'initialize' },
+            { type: 'skill_started', message: '发现基础设施资源', skill: 'discover-resources', resources: [
+                { id: 'vpc-001', type: 'vpc', name: '生产VPC', status: 'active' }
+            ]},
+            { type: 'skill_progress', message: '正在扫描VPC配置...', skill: 'discover-resources', progress: 30 },
+            { type: 'skill_completed', message: '资源发现完成', skill: 'discover-resources', progress: 100 },
+            { type: 'skill_started', message: '开始部署配置', skill: 'deploy-config', resources: [
+                { id: 'config-001', type: 'config', name: '应用配置', status: 'building' }
+            ]},
+            { type: 'skill_progress', message: '正在验证配置...', skill: 'deploy-config', progress: 50 },
+            { type: 'skill_completed', message: '配置部署完成', skill: 'deploy-config', progress: 100 },
+            { type: 'skill_started', message: '部署安全组', skill: 'deploy-security', resources: [
+                { id: 'sg-001', type: 'security_group', name: 'Web安全组', status: 'building' }
+            ]},
+            { type: 'skill_progress', message: '正在配置防火墙规则...', skill: 'deploy-security', progress: 60 },
+            { type: 'skill_completed', message: '安全组部署完成', skill: 'deploy-security', progress: 100 },
+            { type: 'skill_started', message: '部署ADS集群', skill: 'deploy-ads', resources: [
+                { id: 'ads-001', type: 'ads', name: '生产ADS集群', status: 'building' }
+            ]},
+            { type: 'skill_progress', message: '正在创建节点...', skill: 'deploy-ads', progress: 20 },
+            { type: 'skill_progress', message: '正在配置网络...', skill: 'deploy-ads', progress: 45 },
+            { type: 'skill_progress', message: '正在启动服务...', skill: 'deploy-ads', progress: 70 },
+            { type: 'skill_progress', message: '正在进行健康检查...', skill: 'deploy-ads', progress: 90 },
+            { type: 'skill_completed', message: 'ADS集群部署完成', skill: 'deploy-ads', progress: 100 },
+            { type: 'skill_started', message: '部署负载均衡器', skill: 'deploy-lb', resources: [
+                { id: 'lb-001', type: 'load_balancer', name: '公网负载均衡', status: 'building' }
+            ]},
+            { type: 'skill_progress', message: '正在配置监听器...', skill: 'deploy-lb', progress: 55 },
+            { type: 'skill_completed', message: '负载均衡器部署完成', skill: 'deploy-lb', progress: 100 },
+            { type: 'workflow_completed', message: '部署工作流完成', skill: 'complete' }
+        ];
+
+        // 初始化
+        function init() {
+            addEvent('system', '系统初始化完成，等待部署...');
+        }
+
+        // 添加事件日志
+        function addEvent(type, message) {
+            const eventLog = document.getElementById('event-log-content');
+            const time = new Date().toLocaleTimeString('zh-CN');
+
+            const eventItem = document.createElement('div');
+            eventItem.className = 'event-item';
+            eventItem.innerHTML = `
+                <span class="event-time">${time}</span>
+                <span class="event-type ${type}">${type.toUpperCase()}</span>
+                <span class="event-message">${message}</span>
+            `;
+
+            eventLog.insertBefore(eventItem, eventLog.firstChild);
+
+            // 限制日志条目数量
+            while (eventLog.children.length > 50) {
+                eventLog.removeChild(eventLog.lastChild);
+            }
+        }
+
+        // 创建单位
+        function createUnit(resource, index) {
+            const gameMap = document.getElementById('game-map');
+            const unitType = RESOURCE_TYPES[resource.type];
+
+            // 随机位置（但避免重叠）
+            const x = 100 + (index * 120) % 600;
+            const y = 100 + Math.floor(index / 5) * 120;
+
+            const unit = document.createElement('div');
+            unit.className = 'unit';
+            unit.id = `unit-${resource.id}`;
+            unit.style.left = `${x}px`;
+            unit.style.top = `${y}px`;
+            unit.style.color = unitType.color;
+
+            unit.innerHTML = `
+                <div class="unit-icon">${unitType.icon}</div>
+                <div class="unit-label">${resource.name}</div>
+                ${resource.status === 'building' ? '<div class="unit-progress"><div class="unit-progress-fill" style="width: 0%"></div></div>' : ''}
+            `;
+
+            gameMap.appendChild(unit);
+
+            // 添加到单位列表
+            addUnitToList(resource);
+
+            // 添加到小地图
+            addToMinimap(resource, x, y, unitType.color);
+
+            units.push(resource);
+            updateStats();
+        }
+
+        // 添加单位到列表
+        function addUnitToList(resource) {
+            const unitList = document.getElementById('unit-list');
+            const unitType = RESOURCE_TYPES[resource.type];
+
+            const listItem = document.createElement('div');
+            listItem.className = `unit-list-item ${resource.status}`;
+            listItem.id = `list-item-${resource.id}`;
+            listItem.innerHTML = `
+                <div class="unit-list-item-icon">${unitType.icon}</div>
+                <div class="unit-list-item-info">
+                    <div class="unit-list-item-name">${resource.name}</div>
+                    <div class="unit-list-item-status">${resource.status === 'building' ? '构建中...' : '运行中'}</div>
+                </div>
+                <div class="unit-list-item-badge added">NEW</div>
+            `;
+
+            unitList.appendChild(listItem);
+        }
+
+        // 添加到小地图
+        function addToMinimap(resource, x, y, color) {
+            const minimap = document.getElementById('minimap-content');
+
+            const dot = document.createElement('div');
+            dot.className = 'minimap-unit';
+            dot.style.left = `${(x / 800) * 100}%`;
+            dot.style.top = `${(y / 600) * 100}%`;
+            dot.style.backgroundColor = color;
+
+            minimap.appendChild(dot);
+        }
+
+        // 更新单位进度
+        function updateUnitProgress(resourceId, progress) {
+            const unit = document.getElementById(`unit-${resourceId}`);
+            if (unit) {
+                const progressFill = unit.querySelector('.unit-progress-fill');
+                if (progressFill) {
+                    progressFill.style.width = `${progress}%`;
+                }
+            }
+
+            // 更新列表项
+            const listItem = document.getElementById(`list-item-${resourceId}`);
+            if (listItem) {
+                const statusDiv = listItem.querySelector('.unit-list-item-status');
+                if (statusDiv) {
+                    statusDiv.textContent = `构建中 ${progress}%`;
+                }
+            }
+        }
+
+        // 完成单位构建
+        function completeUnit(resourceId) {
+            const unit = document.getElementById(`unit-${resourceId}`);
+            if (unit) {
+                unit.classList.remove('unit-building');
+                const progressBar = unit.querySelector('.unit-progress');
+                if (progressBar) {
+                    progressBar.remove();
+                }
+            }
+
+            const listItem = document.getElementById(`list-item-${resourceId}`);
+            if (listItem) {
+                listItem.classList.remove('building');
+                const statusDiv = listItem.querySelector('.unit-list-item-status');
+                if (statusDiv) {
+                    statusDiv.textContent = '运行中';
+                }
+            }
+
+            updateStats();
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const total = units.length;
+            const active = units.filter(u => u.status === 'active').length;
+            const building = units.filter(u => u.status === 'building').length;
+            const failed = units.filter(u => u.status === 'failed').length;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-active').textContent = active;
+            document.getElementById('stat-building').textContent = building;
+            document.getElementById('stat-failed').textContent = failed;
+        }
+
+        // 更新进度条
+        function updateProgress(percent, skill) {
+            const progressFill = document.getElementById('progress-fill');
+            const currentSkill = document.getElementById('current-skill');
+
+            progressFill.style.width = `${percent}%`;
+            progressFill.textContent = `${percent}%`;
+            currentSkill.textContent = skill || '等待开始...';
+        }
+
+        // 切换模拟
+        function toggleSimulation() {
+            if (simulationRunning) {
+                return;
+            }
+
+            simulationRunning = true;
+            currentStep = 0;
+
+            const btn = document.querySelector('.control-btn');
+            btn.textContent = '⏸️ 运行中...';
+            btn.classList.add('active');
+
+            runNextStep();
+        }
+
+        // 运行下一步
+        function runNextStep() {
+            if (currentStep >= DEPLOYMENT_STEPS.length) {
+                simulationRunning = false;
+                const btn = document.querySelector('.control-btn');
+                btn.textContent = '✅ 完成';
+                setTimeout(() => {
+                    btn.textContent = '▶️ 开始模拟';
+                    btn.classList.remove('active');
+                }, 2000);
+                return;
+            }
+
+            const step = DEPLOYMENT_STEPS[currentStep];
+            const progress = Math.round(((currentStep + 1) / DEPLOYMENT_STEPS.length) * 100);
+
+            // 更新进度
+            updateProgress(progress, step.skill);
+
+            // 添加日志
+            addEvent(step.type, step.message);
+
+            // 处理资源
+            if (step.resources) {
+                step.resources.forEach((resource, index) => {
+                    setTimeout(() => {
+                        createUnit(resource, units.length);
+                    }, index * 200);
+                });
+            }
+
+            // 更新构建中资源的进度
+            if (step.type === 'skill_progress' && step.skill) {
+                units.forEach(unit => {
+                    if (unit.status === 'building') {
+                        updateUnitProgress(unit.id, step.progress);
+                    }
+                });
+            }
+
+            // 完成技能
+            if (step.type === 'skill_completed' && step.skill) {
+                units.forEach(unit => {
+                    if (unit.status === 'building') {
+                        unit.status = 'active';
+                        completeUnit(unit.id);
+                    }
+                });
+            }
+
+            currentStep++;
+
+            // 继续下一步
+            setTimeout(runNextStep, 1000);
+        }
+
+        // 重置模拟
+        function resetSimulation() {
+            simulationRunning = false;
+            currentStep = 0;
+            units = [];
+
+            // 清除地图上的单位
+            const gameMap = document.getElementById('game-map');
+            const existingUnits = gameMap.querySelectorAll('.unit');
+            existingUnits.forEach(unit => unit.remove());
+
+            // 清除列表
+            const unitList = document.getElementById('unit-list');
+            unitList.innerHTML = '';
+
+            // 清除小地图
+            const minimap = document.getElementById('minimap-content');
+            minimap.innerHTML = '';
+
+            // 清除日志
+            const eventLog = document.getElementById('event-log-content');
+            eventLog.innerHTML = '';
+
+            // 重置进度
+            updateProgress(0, '');
+            updateStats();
+
+            const btn = document.querySelector('.control-btn');
+            btn.textContent = '▶️ 开始模拟';
+            btn.classList.remove('active');
+
+            addEvent('system', '模拟已重置');
+        }
+
+        // 对比模式（模拟）
+        function showDiffMode() {
+            addEvent('system', '进入对比模式：显示基础设施变更');
+
+            // 模拟显示一些变更
+            const gameMap = document.getElementById('game-map');
+
+            // 添加一个新增的资源
+            setTimeout(() => {
+                const newUnit = document.createElement('div');
+                newUnit.className = 'unit unit-status-added';
+                newUnit.style.left = '500px';
+                newUnit.style.top = '200px';
+                newUnit.style.color = '#00ff88';
+                newUnit.innerHTML = `
+                    <div class="unit-icon">💾</div>
+                    <div class="unit-label">新缓存节点</div>
+                    <div class="unit-list-item-badge added" style="margin-top: 5px;">+ NEW</div>
+                `;
+                gameMap.appendChild(newUnit);
+                addEvent('diff', '新增资源: 缓存节点 cache-002');
+            }, 500);
+
+            // 添加一个修改的资源
+            setTimeout(() => {
+                if (units.length > 0) {
+                    const existingUnit = document.getElementById(`unit-${units[0].id}`);
+                    if (existingUnit) {
+                        existingUnit.classList.add('unit-status-changed');
+                        addEvent('diff', `修改资源: ${units[0].name} (配置变更)`);
+                    }
+                }
+            }, 1000);
+
+            // 添加一个删除的资源
+            setTimeout(() => {
+                const removedUnit = document.createElement('div');
+                removedUnit.className = 'unit unit-status-removed';
+                removedUnit.style.left = '300px';
+                removedUnit.style.top = '300px';
+                removedUnit.style.color = '#ff6b6b';
+                removedUnit.innerHTML = `
+                    <div class="unit-icon">🗄️</div>
+                    <div class="unit-label">旧数据库</div>
+                    <div class="unit-list-item-badge removed" style="margin-top: 5px;">- DELETE</div>
+                `;
+                gameMap.appendChild(removedUnit);
+                addEvent('diff', '删除资源: 旧数据库 db-old-001');
+            }, 1500);
+        }
+
+        // 页面加载完成后初始化
+        window.onload = init;
+    </script>
+</body>
+</html>

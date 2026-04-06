@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CityBuilder 2D - 像素地图</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background: #1a1a2e;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* 游戏容器 */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #228B22;
+        }
+
+        /* Canvas地图 */
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            cursor: crosshair;
+        }
+
+        /* UI覆盖层 */
+        .ui-overlay {
+            position: absolute;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .ui-overlay > * {
+            pointer-events: auto;
+        }
+
+        /* 顶部状态栏 */
+        .top-bar {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 46, 0.95);
+            border: 4px solid #34495e;
+            padding: 10px 20px;
+            display: flex;
+            gap: 25px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 8px;
+            color: #ecf0f1;
+        }
+
+        .stat-icon {
+            font-size: 14px;
+        }
+
+        .stat-value {
+            color: #f39c12;
+            font-size: 10px;
+        }
+
+        /* 右侧工具栏 - 像素风格 */
+        .tools-panel {
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(26, 26, 46, 0.95);
+            border: 4px solid #34495e;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            color: #f39c12;
+            font-size: 8px;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .tool-btn {
+            width: 64px;
+            height: 64px;
+            background: #34495e;
+            border: 4px solid #2c3e50;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.1s;
+            image-rendering: pixelated;
+        }
+
+        .tool-btn:hover {
+            background: #3d566e;
+            transform: translate(-2px, -2px);
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .tool-btn.selected {
+            background: #f39c12;
+            border-color: #e67e22;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .tool-icon {
+            font-size: 28px;
+        }
+
+        .tool-label {
+            font-size: 6px;
+            color: #ecf0f1;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* 底部控制栏 */
+        .bottom-bar {
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 46, 0.95);
+            border: 4px solid #34495e;
+            padding: 12px 20px;
+            display: flex;
+            gap: 12px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .action-btn {
+            background: #e74c3c;
+            border: 4px solid #c0392b;
+            color: #ecf0f1;
+            padding: 10px 16px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            cursor: pointer;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+            transition: all 0.1s;
+        }
+
+        .action-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .action-btn.secondary {
+            background: #3498db;
+            border-color: #2980b9;
+        }
+
+        /* 建筑信息弹窗 - 像素风格 */
+        .building-popup {
+            position: absolute;
+            background: rgba(26, 26, 46, 0.98);
+            border: 4px solid #f39c12;
+            padding: 16px;
+            min-width: 280px;
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 200;
+        }
+
+        .building-popup.active {
+            display: block;
+            animation: popupAppear 0.2s;
+        }
+
+        @keyframes popupAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .popup-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 4px solid rgba(243, 156, 18, 0.3);
+        }
+
+        .popup-icon {
+            font-size: 40px;
+        }
+
+        .popup-info {
+            flex: 1;
+        }
+
+        .popup-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: #f39c12;
+            margin-bottom: 4px;
+        }
+
+        .popup-type {
+            font-size: 8px;
+            color: #aaa;
+        }
+
+        .popup-close {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .popup-close:hover {
+            background: rgba(231, 76, 60, 0.2);
+        }
+
+        .popup-content {
+            font-size: 8px;
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .popup-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 4px solid rgba(243, 156, 18, 0.2);
+        }
+
+        .popup-stat {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            border: 2px solid rgba(243, 156, 18, 0.2);
+        }
+
+        .popup-stat-label {
+            font-size: 7px;
+            color: #888;
+            margin-bottom: 2px;
+        }
+
+        .popup-stat-value {
+            font-size: 10px;
+            font-weight: bold;
+            color: #f39c12;
+        }
+
+        /* 小地图 */
+        .minimap {
+            bottom: 70px;
+            left: 10px;
+            width: 160px;
+            height: 120px;
+            background: rgba(26, 26, 46, 0.95);
+            border: 4px solid #34495e;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        #minimap-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 帮助面板 */
+        .help-panel {
+            bottom: 70px;
+            right: 10px;
+            background: rgba(26, 26, 46, 0.95);
+            border: 4px solid #34495e;
+            padding: 12px;
+            width: 180px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
+            font-size: 7px;
+            line-height: 1.8;
+            color: #bdc3c7;
+        }
+
+        .help-title {
+            color: #f39c12;
+            font-size: 8px;
+            margin-bottom: 8px;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 60px;
+            right: 280px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: rgba(26, 26, 46, 0.95);
+            border: 4px solid #f39c12;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            min-width: 280px;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.5);
+            animation: toastSlide 0.3s;
+        }
+
+        @keyframes toastSlide {
+            from {
+                transform: translateX(400px);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .toast-title {
+            color: #f39c12;
+            font-size: 10px;
+            margin-bottom: 8px;
+        }
+
+        .toast-message {
+            color: #ecf0f1;
+            font-size: 8px;
+            line-height: 1.6;
+        }
+
+        /* 像素滚动条 */
+        ::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #f39c12, #e74c3c);
+            border: 2px solid #2c3e50;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #e74c3c, #c0392b);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+
+        <!-- UI覆盖层 -->
+        <div class="ui-overlay">
+            <!-- 顶部状态栏 -->
+            <div class="top-bar">
+                <div class="stat">
+                    <span class="stat-icon">🏗️</span>
+                    <span>建筑: <span class="stat-value" id="stat-buildings">0</span></span>
+                </div>
+                <div class="stat">
+                    <span class="stat-icon">⚡</span>
+                    <span>电力: <span class="stat-value" id="stat-power">100%</span></span>
+                </div>
+                <div class="stat">
+                    <span class="stat-icon">💰</span>
+                    <span>费用: <span class="stat-value" id="stat-cost">¥0/月</span></span>
+                </div>
+                <div class="stat">
+                    <span class="stat-icon">⚠️</span>
+                    <span>漂移: <span class="stat-value" id="stat-drift">0</span></span>
+                </div>
+            </div>
+
+            <!-- 右侧工具栏 -->
+            <div class="tools-panel">
+                <div class="panel-title">🏗️ 建筑工具</div>
+
+                <button class="tool-btn" data-type="house" onclick="selectTool('house')">
+                    <span class="tool-icon">🏠</span>
+                    <span class="tool-label">住宅</span>
+                </button>
+
+                <button class="tool-btn" data-type="office" onclick="selectTool('office')">
+                    <span class="tool-icon">🏢</span>
+                    <span class="tool-label">办公楼</span>
+                </button>
+
+                <button class="tool-btn" data-type="shop" onclick="selectTool('shop')">
+                    <span class="tool-icon">🏪</span>
+                    <span class="tool-label">商店</span>
+                </button>
+
+                <button class="tool-btn" data-type="factory" onclick="selectTool('factory')">
+                    <span class="tool-icon">🏭</span>
+                    <span class="tool-label">工厂</span>
+                </button>
+
+                <button class="tool-btn" data-type="bank" onclick="selectTool('bank')">
+                    <span class="tool-icon">🏦</span>
+                    <span class="tool-label">银行</span>
+                </button>
+
+                <button class="tool-btn" data-type="hospital" onclick="selectTool('hospital')">
+                    <span class="tool-icon">🏥</span>
+                    <span class="tool-label">医院</span>
+                </button>
+
+                <button class="tool-btn" data-type="school" onclick="selectTool('school')">
+                    <span class="tool-icon">🏫</span>
+                    <span class="tool-label">学校</span>
+                </button>
+
+                <button class="tool-btn" data-type="park" onclick="selectTool('park')">
+                    <span class="tool-icon">🌳</span>
+                    <span class="tool-label">公园</span>
+                </button>
+
+                <button class="tool-btn" data-type="road" onclick="selectTool('road')">
+                    <span class="tool-icon">🛣️</span>
+                    <span class="tool-label">道路</span>
+                </button>
+
+                <button class="tool-btn" data-type="power" onclick="selectTool('power')">
+                    <span class="tool-icon">⚡</span>
+                    <span class="tool-label">电厂</span>
+                </button>
+            </div>
+
+            <!-- 建筑信息弹窗 -->
+            <div class="building-popup" id="building-popup">
+                <div class="popup-header">
+                    <span class="popup-icon" id="popup-icon">🏦</span>
+                    <div class="popup-info">
+                        <div class="popup-name" id="popup-name">银行金库</div>
+                        <div class="popup-type" id="popup-type">数据库实例</div>
+                    </div>
+                    <button class="popup-close" onclick="closePopup()">×</button>
+                </div>
+                <div class="popup-content" id="popup-content">
+                    <p>高可用MySQL数据库集群，包含1主2从架构，支持自动故障转移。</p>
+                    <div class="popup-stats">
+                        <div class="popup-stat">
+                            <div class="popup-stat-label">规格</div>
+                            <div class="popup-stat-value" id="popup-spec">8核32GB</div>
+                        </div>
+                        <div class="popup-stat">
+                            <div class="popup-stat-label">存储</div>
+                            <div class="popup-stat-value" id="popup-storage">200GB</div>
+                        </div>
+                        <div class="popup-stat">
+                            <div class="popup-stat-label">状态</div>
+                            <div class="popup-stat-value" id="popup-status">⚠️ 漂移</div>
+                        </div>
+                        <div class="popup-stat">
+                            <div class="popup-stat-label">费用</div>
+                            <div class="popup-stat-value" id="popup-cost">¥1200/月</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 小地图 -->
+            <div class="minimap">
+                <canvas id="minimap-canvas"></canvas>
+            </div>
+
+            <!-- 帮助面板 -->
+            <div class="help-panel">
+                <div class="help-title">🎮 操作指南</div>
+                🖱️ 拖动: 移动地图<br>
+                🔄 滚轮: 缩放<br>
+                📍 点击: 放置/查看<br>
+                ⌨️ Delete: 删除<br>
+                ⌨️ Escape: 取消
+            </div>
+
+            <!-- 底部控制栏 -->
+            <div class="bottom-bar">
+                <button class="action-btn secondary" onclick="startCensus()">🔭 普查</button>
+                <button class="action-btn secondary" onclick="checkDrift()">🔍 稽查</button>
+                <button class="action-btn secondary" onclick="generateCode()">📝 代码</button>
+                <button class="action-btn" onclick="deploy()">🚀 部署</button>
+            </div>
+        </div>
+
+        <!-- Toast容器 -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <script>
+        // 游戏状态
+        const game = {
+            canvas: null,
+            ctx: null,
+            width: 0,
+            height: 0,
+            offsetX: 0,
+            offsetY: 0,
+            zoom: 2,
+            tileSize: 16,
+            mapWidth: 100,
+            mapHeight: 100,
+            selectedTool: null,
+            buildings: [],
+            hoveredTile: null,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0
+        };
+
+        // 建筑类型配置 - 像素风格
+        const buildingTypes = {
+            house: { icon: '🏠', name: '住宅', type: '住宅', cost: 100, color: '#e74c3c', size: 1 },
+            office: { icon: '🏢', name: '办公楼', type: '商业', cost: 300, color: '#3498db', size: 2 },
+            shop: { icon: '🏪', name: '商店', type: '商业', cost: 200, color: '#f39c12', size: 1 },
+            factory: { icon: '🏭', name: '工厂', type: '工业', cost: 400, color: '#9b59b6', size: 2 },
+            bank: { icon: '🏦', name: '银行金库', type: '数据', cost: 500, color: '#e74c3c', size: 2 },
+            hospital: { icon: '🏥', name: '医院', type: '服务', cost: 350, color: '#2ecc71', size: 2 },
+            school: { icon: '🏫', name: '学校', type: '服务', cost: 300, color: '#3498db', size: 2 },
+            park: { icon: '🌳', name: '公园', type: '休闲', cost: 150, color: '#27ae60', size: 1 },
+            road: { icon: '', name: '道路', type: '基建', cost: 50, color: '#7f8c8d', size: 1 },
+            power: { icon: '⚡', name: '电厂', type: '基建', cost: 600, color: '#f1c40f', size: 2 }
+        };
+
+        // 初始化
+        function init() {
+            game.canvas = document.getElementById('game-canvas');
+            game.ctx = game.canvas.getContext('2d');
+
+            resizeCanvas();
+            setupEvents();
+            centerMap();
+            initSampleBuildings();
+            updateStats();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resizeCanvas() {
+            game.width = window.innerWidth;
+            game.height = window.innerHeight;
+            game.canvas.width = game.width;
+            game.canvas.height = game.height;
+
+            const minimap = document.getElementById('minimap-canvas');
+            minimap.width = 160;
+            minimap.height = 120;
+        }
+
+        function centerMap() {
+            const mapPixelWidth = game.mapWidth * game.tileSize * game.zoom;
+            const mapPixelHeight = game.mapHeight * game.tileSize * game.zoom;
+            game.offsetX = (game.width - mapPixelWidth) / 2;
+            game.offsetY = (game.height - mapPixelHeight) / 2;
+        }
+
+        function setupEvents() {
+            window.addEventListener('resize', resizeCanvas);
+
+            game.canvas.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    game.isDragging = true;
+                    game.lastX = e.clientX;
+                    game.lastY = e.clientY;
+                }
+            });
+
+            game.canvas.addEventListener('mousemove', (e) => {
+                if (game.isDragging) {
+                    const dx = e.clientX - game.lastX;
+                    const dy = e.clientY - game.lastY;
+                    game.offsetX += dx;
+                    game.offsetY += dy;
+                    game.lastX = e.clientX;
+                    game.lastY = e.clientY;
+                }
+
+                updateHoveredTile(e);
+            });
+
+            game.canvas.addEventListener('mouseup', (e) => {
+                if (!game.isDragging) return;
+
+                const dx = Math.abs(e.clientX - game.lastX);
+                const dy = Math.abs(e.clientY - game.lastY);
+
+                if (dx < 5 && dy < 5) {
+                    handleClick(e);
+                }
+
+                game.isDragging = false;
+            });
+
+            game.canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newZoom = Math.max(1, Math.min(4, game.zoom * delta));
+
+                // 以鼠标位置为中心缩放
+                const rect = game.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const zoomRatio = newZoom / game.zoom;
+                game.offsetX = mouseX - (mouseX - game.offsetX) * zoomRatio;
+                game.offsetY = mouseY - (mouseY - game.offsetY) * zoomRatio;
+                game.zoom = newZoom;
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    game.selectedTool = null;
+                    document.querySelectorAll('.tool-btn').forEach(btn => {
+                        btn.classList.remove('selected');
+                    });
+                    closePopup();
+                }
+                if (e.key === 'Delete') {
+                    if (game.hoveredTile) {
+                        deleteBuildingAt(game.hoveredTile.x, game.hoveredTile.y);
+                    }
+                }
+            });
+        }
+
+        function updateHoveredTile(e) {
+            const rect = game.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const worldX = Math.floor((x - game.offsetX) / (game.tileSize * game.zoom));
+            const worldY = Math.floor((y - game.offsetY) / (game.tileSize * game.zoom));
+
+            if (worldX >= 0 && worldX < game.mapWidth && worldY >= 0 && worldY < game.mapHeight) {
+                game.hoveredTile = { x: worldX, y: worldY };
+            } else {
+                game.hoveredTile = null;
+            }
+        }
+
+        function handleClick(e) {
+            if (!game.hoveredTile) return;
+
+            const { x, y } = game.hoveredTile;
+
+            // 检查是否有建筑
+            const existing = game.buildings.find(b => b.x === x && b.y === y);
+
+            if (existing) {
+                showPopup(existing, e.clientX, e.clientY);
+            } else if (game.selectedTool) {
+                placeBuilding(x, y);
+            }
+        }
+
+        function selectTool(tool) {
+            game.selectedTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.querySelector(`[data-type="${tool}"]`).classList.add('selected');
+
+            const building = buildingTypes[tool];
+            showToast('工具已选择', `点击地图放置 ${building.name}`);
+        }
+
+        function placeBuilding(x, y) {
+            const newBuilding = {
+                id: Date.now(),
+                x,
+                y,
+                type: game.selectedTool,
+                status: 'building',
+                progress: 0
+            };
+
+            game.buildings.push(newBuilding);
+            showToast('开始建造', `正在建造 ${buildingTypes[game.selectedTool].name}...`);
+
+            // 建造动画
+            const interval = setInterval(() => {
+                newBuilding.progress += 10;
+                if (newBuilding.progress >= 100) {
+                    newBuilding.progress = 100;
+                    newBuilding.status = 'normal';
+                    clearInterval(interval);
+                    showToast('建造完成', `${buildingTypes[game.selectedTool].name} 已建成！`);
+                    updateStats();
+                }
+            }, 200);
+        }
+
+        function deleteBuildingAt(x, y) {
+            const index = game.buildings.findIndex(b => b.x === x && b.y === y);
+            if (index > -1) {
+                game.buildings.splice(index, 1);
+                closePopup();
+                showToast('删除成功', '建筑已移除');
+                updateStats();
+            }
+        }
+
+        function showPopup(building, screenX, screenY) {
+            const popup = document.getElementById('building-popup');
+            const config = buildingTypes[building.type];
+
+            document.getElementById('popup-icon').textContent = config.icon;
+            document.getElementById('popup-name').textContent = config.name;
+            document.getElementById('popup-type').textContent = config.type;
+            document.getElementById('popup-spec').textContent = '标准规格';
+            document.getElementById('popup-storage').textContent = '200GB';
+            document.getElementById('popup-status').textContent = building.status === 'drift' ? '⚠️ 漂移' : '✓ 正常';
+            document.getElementById('popup-cost').textContent = `¥${config.cost}/月`;
+
+            popup.style.left = `${Math.min(screenX + 20, game.width - 300)}px`;
+            popup.style.top = `${Math.min(screenY - 50, game.height - 200)}px`;
+            popup.classList.add('active');
+        }
+
+        function closePopup() {
+            document.getElementById('building-popup').classList.remove('active');
+        }
+
+        function initSampleBuildings() {
+            // 添加示例建筑
+            game.buildings = [
+                { id: 1, type: 'office', x: 20, y: 20, status: 'normal', progress: 100 },
+                { id: 2, type: 'office', x: 25, y: 20, status: 'drift', progress: 100 },
+                { id: 3, type: 'factory', x: 30, y: 25, status: 'normal', progress: 100 },
+                { id: 4, type: 'bank', x: 20, y: 30, status: 'drift', progress: 100 },
+                { id: 5, type: 'shop', x: 25, y: 30, status: 'normal', progress: 100 },
+                { id: 6, type: 'power', x: 35, y: 20, status: 'normal', progress: 100 },
+                { id: 7, type: 'hospital', x: 15, y: 25, status: 'normal', progress: 100 },
+                { id: 8, type: 'school', x: 40, y: 25, status: 'normal', progress: 100 },
+                { id: 9, type: 'park', x: 30, y: 35, status: 'normal', progress: 100 },
+                { id: 10, type: 'road', x: 22, y: 22, status: 'normal', progress: 100 },
+                { id: 11, type: 'road', x: 23, y: 22, status: 'normal', progress: 100 },
+                { id: 12, type: 'road', x: 24, y: 22, status: 'normal', progress: 100 }
+            ];
+        }
+
+        function updateStats() {
+            document.getElementById('stat-buildings').textContent = game.buildings.length;
+
+            const driftCount = game.buildings.filter(b => b.status === 'drift').length;
+            document.getElementById('stat-drift').textContent = driftCount;
+
+            const totalCost = game.buildings.reduce((sum, b) => {
+                return sum + buildingTypes[b.type].cost;
+            }, 0);
+            document.getElementById('stat-cost').textContent = `¥${totalCost}/月`;
+        }
+
+        // 绘制游戏
+        function gameLoop() {
+            const ctx = game.ctx;
+
+            // 清空画布
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, 0, game.width, game.height);
+
+            // 保存当前状态
+            ctx.save();
+
+            // 应用变换
+            ctx.translate(game.offsetX, game.offsetY);
+            ctx.scale(game.zoom, game.zoom);
+
+            // 绘制地图
+            drawMap(ctx);
+
+            ctx.restore();
+
+            // 绘制小地图
+            drawMinimap();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawMap(ctx) {
+            const size = game.tileSize;
+
+            // 绘制地面网格
+            for (let y = 0; y < game.mapHeight; y++) {
+                for (let x = 0; x < game.mapWidth; x++) {
+                    const px = x * size;
+                    const py = y * size;
+
+                    // 棋盘格草地
+                    const isLight = (x + y) % 2 === 0;
+                    ctx.fillStyle = isLight ? '#2d9e2d' : '#228B22';
+                    ctx.fillRect(px, py, size, size);
+
+                    // 像素边框
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                    ctx.fillRect(px, py, size, 1);
+                    ctx.fillRect(px, py, 1, size);
+                }
+            }
+
+            // 绘制建筑
+            game.buildings.forEach(building => {
+                const config = buildingTypes[building.type];
+                const px = building.x * size;
+                const py = building.y * size;
+                const buildingSize = config.size * size;
+
+                // 阴影
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(px + 3, py + 3, buildingSize, buildingSize);
+
+                // 建筑背景
+                if (building.status === 'building') {
+                    ctx.fillStyle = '#95a5a6';
+                } else if (building.status === 'drift') {
+                    ctx.fillStyle = '#feca57';
+                } else {
+                    ctx.fillStyle = config.color;
+                }
+
+                // 绘制像素风格建筑
+                ctx.fillRect(px, py, buildingSize, buildingSize);
+
+                // 像素边框（硬边）
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px, py, buildingSize, buildingSize);
+
+                // 绘制图标
+                if (building.status !== 'building' && config.icon) {
+                    ctx.font = `${buildingSize * 0.6}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(config.icon, px + buildingSize / 2, py + buildingSize / 2);
+                }
+
+                // 建造进度
+                if (building.status === 'building') {
+                    const progressHeight = (building.progress / 100) * buildingSize;
+                    ctx.fillStyle = '#f39c12';
+                    ctx.fillRect(px, py + buildingSize - progressHeight, buildingSize, progressHeight);
+                }
+
+                // 漂移警告
+                if (building.status === 'drift') {
+                    ctx.fillStyle = '#c0392b';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.fillText('!', px + buildingSize - 6, py + 8);
+                }
+            });
+
+            // 绘制悬停效果
+            if (game.hoveredTile && game.selectedTool) {
+                const { x, y } = game.hoveredTile;
+                const config = buildingTypes[game.selectedTool];
+                const px = x * size;
+                const py = y * size;
+                const previewSize = config.size * size;
+
+                // 半透明预览
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = config.color;
+                ctx.fillRect(px, py, previewSize, previewSize);
+                ctx.globalAlpha = 1.0;
+
+                // 预览图标
+                if (config.icon) {
+                    ctx.font = `${previewSize * 0.6}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(config.icon, px + previewSize / 2, py + previewSize / 2);
+                }
+            }
+        }
+
+        function drawMinimap() {
+            const canvas = document.getElementById('minimap-canvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, 0, w, h);
+
+            const scaleX = w / game.mapWidth;
+            const scaleY = h / game.mapHeight;
+
+            game.buildings.forEach(b => {
+                const config = buildingTypes[b.type];
+                ctx.fillStyle = config.color;
+                ctx.fillRect(b.x * scaleX, b.y * scaleY, config.size * scaleX, config.size * scaleY);
+            });
+
+            // 视口框
+            const viewX = (-game.offsetX / game.tileSize / game.zoom) * scaleX;
+            const viewY = (-game.offsetY / game.tileSize / game.zoom) * scaleY;
+            const viewW = (game.width / game.tileSize / game.zoom) * scaleX;
+            const viewH = (game.height / game.tileSize / game.zoom) * scaleY;
+
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(viewX, viewY, viewW, viewH);
+        }
+
+        function showToast(title, message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // 操作按钮
+        function startCensus() {
+            showToast('🔭 城市普查', '扫描现网资源生成蓝图...');
+        }
+
+        function checkDrift() {
+            const driftCount = game.buildings.filter(b => b.status === 'drift').length;
+            if (driftCount > 0) {
+                showToast('🔍 违建稽查', `发现 ${driftCount} 个配置漂移！`);
+            } else {
+                showToast('🔍 违建稽查', '未发现配置漂移 ✓');
+            }
+        }
+
+        function generateCode() {
+            showToast('📝 生成代码', 'IaC代码已生成！');
+        }
+
+        function deploy() {
+            showToast('🚀 开始部署', '部署流程已启动...');
+        }
+
+        // 启动游戏
+        window.onload = init;
+    </script>
+</body>
+</html>

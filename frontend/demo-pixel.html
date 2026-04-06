@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CityBuilder Pixel - IaC像素风城市建造</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background: #1a1a2e;
+            color: #eee;
+            overflow: hidden;
+            height: 100vh;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        /* 游戏容器 */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(180deg, #87CEEB 0%, #87CEEB 60%, #228B22 60%, #228B22 100%);
+        }
+
+        /* Canvas地图 */
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+        }
+
+        /* 像素风UI */
+        .pixel-ui {
+            position: absolute;
+            z-index: 100;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        /* 顶部状态栏 */
+        .top-bar {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2c3e50;
+            border: 4px solid #34495e;
+            padding: 10px 20px;
+            display: flex;
+            gap: 30px;
+            box-shadow: 4px 4px 0 #1a252f;
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 10px;
+            color: #ecf0f1;
+        }
+
+        .stat-icon {
+            font-size: 16px;
+        }
+
+        .stat-value {
+            color: #f39c12;
+        }
+
+        /* 右侧工具栏 */
+        .tools-panel {
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #2c3e50;
+            border: 4px solid #34495e;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 4px 4px 0 #1a252f;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            color: #f39c12;
+            font-size: 10px;
+            text-align: center;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .tool-btn {
+            width: 60px;
+            height: 60px;
+            background: #34495e;
+            border: 3px solid #2c3e50;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: all 0.1s;
+            image-rendering: pixelated;
+        }
+
+        .tool-btn:hover {
+            background: #3d566e;
+            transform: translate(-2px, -2px);
+            box-shadow: 2px 2px 0 #1a252f;
+        }
+
+        .tool-btn.selected {
+            background: #f39c12;
+            border-color: #e67e22;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .tool-icon {
+            font-size: 24px;
+            image-rendering: pixelated;
+        }
+
+        .tool-label {
+            font-size: 6px;
+            color: #ecf0f1;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* 底部控制栏 */
+        .bottom-bar {
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2c3e50;
+            border: 4px solid #34495e;
+            padding: 12px 20px;
+            display: flex;
+            gap: 15px;
+            box-shadow: 4px 4px 0 #1a252f;
+        }
+
+        .action-btn {
+            background: #e74c3c;
+            border: 3px solid #c0392b;
+            color: #ecf0f1;
+            padding: 10px 15px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            cursor: pointer;
+            box-shadow: 3px 3px 0 #962d22;
+            transition: all 0.1s;
+        }
+
+        .action-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0 #962d22;
+        }
+
+        .action-btn:active {
+            transform: translate(0, 0);
+            box-shadow: 1px 1px 0 #962d22;
+        }
+
+        .action-btn.secondary {
+            background: #3498db;
+            border-color: #2980b9;
+            box-shadow: 3px 3px 0 #1a5276;
+        }
+
+        .action-btn.secondary:hover {
+            box-shadow: 5px 5px 0 #1a5276;
+        }
+
+        /* 信息面板 */
+        .info-panel {
+            top: 80px;
+            left: 10px;
+            background: #2c3e50;
+            border: 4px solid #34495e;
+            padding: 15px;
+            min-width: 250px;
+            box-shadow: 4px 4px 0 #1a252f;
+            display: none;
+        }
+
+        .info-panel.active {
+            display: block;
+            animation: slideIn 0.2s;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .info-header {
+            color: #f39c12;
+            font-size: 10px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 2px solid #34495e;
+            font-size: 8px;
+        }
+
+        .info-label {
+            color: #95a5a6;
+        }
+
+        .info-value {
+            color: #ecf0f1;
+        }
+
+        .info-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .info-btn {
+            flex: 1;
+            background: #27ae60;
+            border: 2px solid #229954;
+            color: #ecf0f1;
+            padding: 8px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 7px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 #1e8449;
+        }
+
+        .info-btn:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 3px 3px 0 #1e8449;
+        }
+
+        .info-btn.danger {
+            background: #e74c3c;
+            border-color: #c0392b;
+            box-shadow: 2px 2px 0 #962d22;
+        }
+
+        .info-btn.danger:hover {
+            box-shadow: 3px 3px 0 #962d22;
+        }
+
+        /* 小地图 */
+        .minimap {
+            bottom: 70px;
+            left: 10px;
+            width: 150px;
+            height: 120px;
+            background: #2c3e50;
+            border: 4px solid #34495e;
+            box-shadow: 4px 4px 0 #1a252f;
+        }
+
+        #minimap-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 10px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: #2c3e50;
+            border: 4px solid #f39c12;
+            padding: 15px;
+            margin-bottom: 10px;
+            min-width: 300px;
+            box-shadow: 4px 4px 0 #1a252f;
+            animation: toastSlide 0.3s;
+        }
+
+        @keyframes toastSlide {
+            from {
+                transform: translateX(400px);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .toast-title {
+            color: #f39c12;
+            font-size: 10px;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .toast-message {
+            color: #ecf0f1;
+            font-size: 8px;
+            line-height: 1.6;
+        }
+
+        /* 帮助提示 */
+        .help-panel {
+            bottom: 70px;
+            right: 10px;
+            background: #2c3e50;
+            border: 4px solid #34495e;
+            padding: 15px;
+            width: 200px;
+            box-shadow: 4px 4px 0 #1a252f;
+            font-size: 7px;
+            line-height: 1.8;
+            color: #bdc3c7;
+        }
+
+        .help-title {
+            color: #f39c12;
+            font-size: 8px;
+            margin-bottom: 10px;
+        }
+
+        /* 缩放控制 */
+        .zoom-controls {
+            top: 50%;
+            left: 10px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: #2c3e50;
+            border: 3px solid #34495e;
+            color: #ecf0f1;
+            font-size: 18px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            box-shadow: 3px 3px 0 #1a252f;
+        }
+
+        .zoom-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 5px 5px 0 #1a252f;
+        }
+
+        /* 像素边框效果 */
+        .pixel-border {
+            box-shadow:
+                4px 0 0 #1a252f,
+                -4px 0 0 #1a252f,
+                0 4px 0 #1a252f,
+                0 -4px 0 #1a252f;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+
+        <!-- 顶部状态栏 -->
+        <div class="pixel-ui top-bar">
+            <div class="stat">
+                <span class="stat-icon">🏗️</span>
+                <span>建筑: <span class="stat-value" id="stat-buildings">0</span></span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">⚡</span>
+                <span>电力: <span class="stat-value" id="stat-power">100%</span></span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">💰</span>
+                <span>费用: <span class="stat-value">¥0/月</span></span>
+            </div>
+        </div>
+
+        <!-- 右侧工具栏 -->
+        <div class="pixel-ui tools-panel">
+            <div class="panel-title">🏗️ 建筑</div>
+
+            <button class="tool-btn" data-type="office" onclick="selectTool('office')">
+                <span class="tool-icon">🏢</span>
+                <span class="tool-label">办公楼</span>
+            </button>
+
+            <button class="tool-btn" data-type="factory" onclick="selectTool('factory')">
+                <span class="tool-icon">🏭</span>
+                <span class="tool-label">工厂</span>
+            </button>
+
+            <button class="tool-btn" data-type="bank" onclick="selectTool('bank')">
+                <span class="tool-icon">🏦</span>
+                <span class="tool-label">金库</span>
+            </button>
+
+            <button class="tool-btn" data-type="warehouse" onclick="selectTool('warehouse')">
+                <span class="tool-icon">🏪</span>
+                <span class="tool-label">仓库</span>
+            </button>
+
+            <button class="tool-btn" data-type="station" onclick="selectTool('station')">
+                <span class="tool-icon">🚂</span>
+                <span class="tool-label">车站</span>
+            </button>
+
+            <button class="tool-btn" data-type="network" onclick="selectTool('network')">
+                <span class="tool-icon">🌐</span>
+                <span class="tool-label">网络</span>
+            </button>
+
+            <button class="tool-btn" data-type="security" onclick="selectTool('security')">
+                <span class="tool-icon">🛡️</span>
+                <span class="tool-label">安保</span>
+            </button>
+
+            <button class="tool-btn" data-type="observatory" onclick="selectTool('observatory')">
+                <span class="tool-icon">📡</span>
+                <span class="tool-label">监控</span>
+            </button>
+
+            <button class="tool-btn" data-type="power" onclick="selectTool('power')">
+                <span class="tool-icon">⚡</span>
+                <span class="tool-label">电厂</span>
+            </button>
+
+            <button class="tool-btn" data-type="road" onclick="selectTool('road')">
+                <span class="tool-icon">🛣️</span>
+                <span class="tool-label">道路</span>
+            </button>
+        </div>
+
+        <!-- 左侧信息面板 -->
+        <div class="pixel-ui info-panel" id="info-panel">
+            <div class="info-header" id="info-title">🏦 银行金库</div>
+            <div class="info-row">
+                <span class="info-label">类型:</span>
+                <span class="info-value" id="info-type">数据库</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">规格:</span>
+                <span class="info-value" id="info-spec">8核32GB</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">状态:</span>
+                <span class="info-value" id="info-status">⚠️ 漂移</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">费用:</span>
+                <span class="info-value" id="info-cost">¥1,200/月</span>
+            </div>
+            <div class="info-buttons">
+                <button class="info-btn" onclick="syncBlueprint()">🔄 同步</button>
+                <button class="info-btn danger" onclick="rollback()">⚠️ 回滚</button>
+            </div>
+        </div>
+
+        <!-- 缩放控制 -->
+        <div class="pixel-ui zoom-controls">
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <button class="zoom-btn" onclick="zoomOut()">−</button>
+        </div>
+
+        <!-- 小地图 -->
+        <div class="pixel-ui minimap">
+            <canvas id="minimap-canvas"></canvas>
+        </div>
+
+        <!-- 帮助面板 -->
+        <div class="pixel-ui help-panel">
+            <div class="help-title">🎮 操作指南</div>
+            点击工具选择建筑<br>
+            点击地图放置<br>
+            点击已有建筑查看<br>
+            滚轮缩放地图<br>
+            拖动移动视角
+        </div>
+
+        <!-- 底部控制栏 -->
+        <div class="pixel-ui bottom-bar">
+            <button class="action-btn secondary" onclick="startCensus()">🔭 普查</button>
+            <button class="action-btn secondary" onclick="checkDrift()">🔍 稽查</button>
+            <button class="action-btn secondary" onclick="generateCode()">📝 代码</button>
+            <button class="action-btn" onclick="deploy()">🚀 部署</button>
+        </div>
+
+        <!-- Toast容器 -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <script>
+        // 游戏状态
+        const game = {
+            canvas: null,
+            ctx: null,
+            width: 0,
+            height: 0,
+            offsetX: 0,
+            offsetY: 0,
+            zoom: 1,
+            tileSize: 32,
+            mapWidth: 50,
+            mapHeight: 50,
+            selectedTool: null,
+            buildings: [],
+            hoveredTile: null,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0
+        };
+
+        // 建筑类型配置
+        const buildingTypes = {
+            office: { icon: '🏢', name: '办公楼', type: '微服务', cost: 800, color: '#3498db' },
+            factory: { icon: '🏭', name: '工厂', type: '批处理', cost: 1000, color: '#9b59b6' },
+            bank: { icon: '🏦', name: '金库', type: '数据库', cost: 1200, color: '#e74c3c' },
+            warehouse: { icon: '🏪', name: '仓库', type: '缓存', cost: 600, color: '#f39c12' },
+            station: { icon: '🚂', name: '车站', type: '消息队列', cost: 500, color: '#e67e22' },
+            network: { icon: '🌐', name: '网络中心', type: 'VPC', cost: 400, color: '#16a085' },
+            security: { icon: '🛡️', name: '安保', type: '安全组', cost: 300, color: '#8e44ad' },
+            observatory: { icon: '📡', name: '监控塔', type: '监控', cost: 350, color: '#2980b9' },
+            power: { icon: '⚡', name: '电厂', type: '计算', cost: 900, color: '#f1c40f' },
+            road: { icon: '🛣️', name: '道路', type: '连接', cost: 50, color: '#7f8c8d' }
+        };
+
+        // 初始化
+        function init() {
+            game.canvas = document.getElementById('game-canvas');
+            game.ctx = game.canvas.getContext('2d');
+
+            resizeCanvas();
+            setupEvents();
+            centerMap();
+            initSampleBuildings();
+            updateStats();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resizeCanvas() {
+            game.width = window.innerWidth;
+            game.height = window.innerHeight;
+            game.canvas.width = game.width;
+            game.canvas.height = game.height;
+
+            const minimap = document.getElementById('minimap-canvas');
+            minimap.width = 150;
+            minimap.height = 120;
+        }
+
+        function centerMap() {
+            const mapPixelWidth = game.mapWidth * game.tileSize;
+            const mapPixelHeight = game.mapHeight * game.tileSize;
+            game.offsetX = (game.width - mapPixelWidth) / 2;
+            game.offsetY = (game.height - mapPixelHeight) / 2;
+        }
+
+        function initSampleBuildings() {
+            // 添加一些示例建筑
+            game.buildings = [
+                { x: 10, y: 10, type: 'office', status: 'normal' },
+                { x: 12, y: 10, type: 'factory', status: 'normal' },
+                { x: 10, y: 12, type: 'bank', status: 'drift' },
+                { x: 12, y: 12, type: 'warehouse', status: 'normal' },
+                { x: 14, y: 11, type: 'power', status: 'normal' },
+                { x: 8, y: 11, type: 'network', status: 'normal' }
+            ];
+        }
+
+        function setupEvents() {
+            window.addEventListener('resize', resizeCanvas);
+
+            game.canvas.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    game.isDragging = true;
+                    game.lastX = e.clientX;
+                    game.lastY = e.clientY;
+                }
+            });
+
+            game.canvas.addEventListener('mousemove', (e) => {
+                if (game.isDragging) {
+                    const dx = e.clientX - game.lastX;
+                    const dy = e.clientY - game.lastY;
+                    game.offsetX += dx;
+                    game.offsetY += dy;
+                    game.lastX = e.clientX;
+                    game.lastY = e.clientY;
+                }
+
+                updateHoveredTile(e);
+            });
+
+            game.canvas.addEventListener('mouseup', (e) => {
+                if (!game.isDragging) return;
+
+                const dx = Math.abs(e.clientX - game.lastX);
+                const dy = Math.abs(e.clientY - game.lastY);
+
+                if (dx < 5 && dy < 5) {
+                    handleClick(e);
+                }
+
+                game.isDragging = false;
+            });
+
+            game.canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                game.zoom = Math.max(0.5, Math.min(2, game.zoom * delta));
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    game.selectedTool = null;
+                    document.querySelectorAll('.tool-btn').forEach(btn => {
+                        btn.classList.remove('selected');
+                    });
+                    document.getElementById('info-panel').classList.remove('active');
+                }
+            });
+        }
+
+        function updateHoveredTile(e) {
+            const rect = game.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const worldX = Math.floor((x - game.offsetX) / (game.tileSize * game.zoom));
+            const worldY = Math.floor((y - game.offsetY) / (game.tileSize * game.zoom));
+
+            if (worldX >= 0 && worldX < game.mapWidth && worldY >= 0 && worldY < game.mapHeight) {
+                game.hoveredTile = { x: worldX, y: worldY };
+            } else {
+                game.hoveredTile = null;
+            }
+        }
+
+        function handleClick(e) {
+            if (!game.hoveredTile) return;
+
+            const { x, y } = game.hoveredTile;
+
+            // 检查是否有建筑
+            const existing = game.buildings.find(b => b.x === x && b.y === y);
+
+            if (existing) {
+                showBuildingInfo(existing);
+            } else if (game.selectedTool) {
+                placeBuilding(x, y);
+            }
+        }
+
+        function selectTool(tool) {
+            game.selectedTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.querySelector(`[data-type="${tool}"]`).classList.add('selected');
+
+            const building = buildingTypes[tool];
+            showToast('工具已选择', `点击地图放置 ${building.name}`);
+        }
+
+        function placeBuilding(x, y) {
+            const newBuilding = {
+                x,
+                y,
+                type: game.selectedTool,
+                status: 'building',
+                progress: 0
+            };
+
+            game.buildings.push(newBuilding);
+            showToast('开始建造', `正在建造 ${buildingTypes[game.selectedTool].name}...`);
+
+            // 建造动画
+            const interval = setInterval(() => {
+                newBuilding.progress += 5;
+                if (newBuilding.progress >= 100) {
+                    newBuilding.progress = 100;
+                    newBuilding.status = 'normal';
+                    clearInterval(interval);
+                    showToast('建造完成', `${buildingTypes[game.selectedTool].name} 已建成！`);
+                    updateStats();
+                }
+            }, 100);
+
+            updateStats();
+        }
+
+        function showBuildingInfo(building) {
+            const config = buildingTypes[building.type];
+            const panel = document.getElementById('info-panel');
+
+            document.getElementById('info-title').textContent = `${config.icon} ${config.name}`;
+            document.getElementById('info-type').textContent = config.type;
+            document.getElementById('info-spec').textContent = '标准规格';
+            document.getElementById('info-status').textContent = building.status === 'drift' ? '⚠️ 漂移' : '✓ 正常';
+            document.getElementById('info-cost').textContent = `¥${config.cost}/月`;
+
+            panel.classList.add('active');
+            panel.currentBuilding = building;
+        }
+
+        // 绘制游戏
+        function gameLoop() {
+            const ctx = game.ctx;
+
+            // 清空画布
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, game.width, game.height);
+
+            // 绘制地面
+            ctx.save();
+            ctx.translate(game.offsetX, game.offsetY);
+            ctx.scale(game.zoom, game.zoom);
+
+            drawGround(ctx);
+            drawBuildings(ctx);
+            drawHover(ctx);
+
+            ctx.restore();
+
+            drawMinimap();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawGround(ctx) {
+            const size = game.tileSize;
+
+            for (let y = 0; y < game.mapHeight; y++) {
+                for (let x = 0; x < game.mapWidth; x++) {
+                    const px = x * size;
+                    const py = y * size;
+
+                    // 草地
+                    ctx.fillStyle = (x + y) % 2 === 0 ? '#228B22' : '#2d9e2d';
+                    ctx.fillRect(px, py, size, size);
+
+                    // 像素边框效果
+                    ctx.strokeStyle = '#1e7b1e';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(px, py, size, size);
+                }
+            }
+        }
+
+        function drawBuildings(ctx) {
+            const size = game.tileSize;
+
+            // 按Y坐标排序（实现正确的遮挡关系）
+            const sorted = [...game.buildings].sort((a, b) => a.y - b.y);
+
+            sorted.forEach(building => {
+                const config = buildingTypes[building.type];
+                const px = building.x * size;
+                const py = building.y * size;
+
+                // 建筑阴影
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(px + 4, py + 4, size, size);
+
+                // 建筑背景
+                if (building.status === 'building') {
+                    ctx.fillStyle = '#95a5a6';
+                } else if (building.status === 'drift') {
+                    ctx.fillStyle = '#feca57';
+                } else {
+                    ctx.fillStyle = config.color;
+                }
+
+                ctx.fillRect(px, py, size, size);
+
+                // 像素边框
+                ctx.strokeStyle = shadeColor(config.color, -30);
+                ctx.lineWidth = 3;
+                ctx.strokeRect(px, py, size, size);
+
+                // 绘制图标
+                if (building.status === 'building') {
+                    // 建造进度
+                    const progressHeight = (building.progress / 100) * size;
+                    ctx.fillStyle = '#f39c12';
+                    ctx.fillRect(px, py + size - progressHeight, size, progressHeight);
+                } else {
+                    // 建筑图标
+                    ctx.font = `${size * 0.6}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(config.icon, px + size / 2, py + size / 2);
+                }
+
+                // 漂移警告
+                if (building.status === 'drift') {
+                    ctx.fillStyle = '#c0392b';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.fillText('!', px + size - 8, py + 10);
+                }
+            });
+        }
+
+        function drawHover(ctx) {
+            if (!game.hoveredTile) return;
+
+            const { x, y } = game.hoveredTile;
+            const size = game.tileSize;
+            const px = x * size;
+            const py = y * size;
+
+            ctx.strokeStyle = 'rgba(243, 156, 18, 0.8)';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(px, py, size, size);
+
+            // 如果选择了工具，显示预览
+            if (game.selectedTool) {
+                const config = buildingTypes[game.selectedTool];
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = config.color;
+                ctx.fillRect(px, py, size, size);
+                ctx.globalAlpha = 1.0;
+
+                ctx.font = `${size * 0.6}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(config.icon, px + size / 2, py + size / 2);
+            }
+        }
+
+        function drawMinimap() {
+            const canvas = document.getElementById('minimap-canvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, 0, w, h);
+
+            const scaleX = w / game.mapWidth;
+            const scaleY = h / game.mapHeight;
+
+            game.buildings.forEach(b => {
+                const config = buildingTypes[b.type];
+                ctx.fillStyle = config.color;
+                ctx.fillRect(b.x * scaleX, b.y * scaleY, scaleX, scaleY);
+            });
+
+            // 视口
+            const viewX = (-game.offsetX / game.tileSize / game.zoom) * scaleX;
+            const viewY = (-game.offsetY / game.tileSize / game.zoom) * scaleY;
+            const viewW = (game.width / game.tileSize / game.zoom) * scaleX;
+            const viewH = (game.height / game.tileSize / game.zoom) * scaleY;
+
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(viewX, viewY, viewW, viewH);
+        }
+
+        function shadeColor(color, percent) {
+            const num = parseInt(color.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = (num >> 16) + amt;
+            const G = (num >> 8 & 0x00FF) + amt;
+            const B = (num & 0x0000FF) + amt;
+            return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+        }
+
+        function updateStats() {
+            document.getElementById('stat-buildings').textContent = game.buildings.length;
+
+            const totalCost = game.buildings.reduce((sum, b) => {
+                return sum + buildingTypes[b.type].cost;
+            }, 0);
+            document.querySelector('.stat-value:nth-child(2)').textContent = `¥${totalCost}/月`;
+        }
+
+        function zoomIn() {
+            game.zoom = Math.min(2, game.zoom * 1.2);
+        }
+
+        function zoomOut() {
+            game.zoom = Math.max(0.5, game.zoom / 1.2);
+        }
+
+        function showToast(title, message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // 操作按钮
+        function startCensus() {
+            showToast('🔭 城市普查', '扫描现网资源生成蓝图...');
+        }
+
+        function checkDrift() {
+            const driftCount = game.buildings.filter(b => b.status === 'drift').length;
+            if (driftCount > 0) {
+                showToast('🔍 违建稽查', `发现 ${driftCount} 个配置漂移！`);
+            } else {
+                showToast('🔍 违建稽查', '未发现配置漂移 ✓');
+            }
+        }
+
+        function generateCode() {
+            showToast('📝 生成代码', 'IaC代码已生成！');
+        }
+
+        function deploy() {
+            showToast('🚀 开始部署', '部署流程已启动...');
+        }
+
+        function syncBlueprint() {
+            showToast('🔄 同步蓝图', '配置已同步到IaC代码');
+        }
+
+        function rollback() {
+            if (confirm('确定回滚此建筑？')) {
+                const panel = document.getElementById('info-panel');
+                if (panel.currentBuilding) {
+                    panel.currentBuilding.status = 'normal';
+                    showToast('✅ 回滚完成', '建筑已恢复到蓝图状态');
+                }
+            }
+        }
+
+        // 启动
+        window.onload = init;
+    </script>
+</body>
+</html>

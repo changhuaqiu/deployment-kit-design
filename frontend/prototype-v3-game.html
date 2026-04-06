@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infrastructure Commander - 策略游戏版 IaC 部署</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a1a;
+            color: #eee;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-rows: 50px 1fr 200px;
+            height: 100vh;
+        }
+
+        /* 顶部状态栏 - HUD */
+        .hud-bar {
+            background: linear-gradient(180deg, rgba(22, 33, 62, 0.95) 0%, rgba(15, 15, 30, 0.95) 100%);
+            border-bottom: 2px solid #00d9ff;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            gap: 20px;
+            box-shadow: 0 2px 20px rgba(0, 217, 255, 0.3);
+        }
+
+        .resource-counter {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 217, 255, 0.1);
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 217, 255, 0.3);
+        }
+
+        .resource-icon {
+            font-size: 18px;
+        }
+
+        .resource-count {
+            font-size: 14px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .game-time {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #00d9ff;
+            font-size: 13px;
+        }
+
+        .notification-bell {
+            position: relative;
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #ff6b6b;
+            color: #000;
+            font-size: 10px;
+            font-weight: bold;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 主游戏区域 */
+        .game-area {
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            gap: 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 左侧控制面板 */
+        .control-panel {
+            background: rgba(15, 15, 30, 0.95);
+            border-right: 2px solid #00d9ff;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .panel-section {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .panel-title {
+            font-size: 12px;
+            color: #00d9ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: rgba(0, 217, 255, 0.1);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            color: #00d9ff;
+            padding: 10px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            text-align: center;
+        }
+
+        .action-btn:hover {
+            background: rgba(0, 217, 255, 0.2);
+            border-color: #00d9ff;
+            transform: translateY(-2px);
+        }
+
+        .action-btn.active {
+            background: rgba(0, 217, 255, 0.3);
+            border-color: #00d9ff;
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+        }
+
+        .action-btn.danger {
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+
+        .action-btn.danger:hover {
+            background: rgba(255, 107, 107, 0.2);
+            border-color: #ff6b6b;
+        }
+
+        .action-btn-icon {
+            font-size: 24px;
+        }
+
+        .action-btn-label {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .action-btn-hint {
+            font-size: 9px;
+            color: #aaa;
+        }
+
+        /* 任务列表 */
+        .mission-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .mission-item {
+            background: rgba(0, 0, 0, 0.5);
+            border-left: 3px solid #00d9ff;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mission-item:hover {
+            background: rgba(0, 217, 255, 0.1);
+            border-left-color: #00ff88;
+        }
+
+        .mission-item.urgent {
+            border-left-color: #ff6b6b;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .mission-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 3px;
+        }
+
+        .mission-desc {
+            font-size: 10px;
+            color: #aaa;
+        }
+
+        /* 中间地图区域 */
+        .map-container {
+            position: relative;
+            background: #050510;
+            overflow: hidden;
+        }
+
+        .map-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(0, 217, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 217, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .map-unit {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .map-unit:hover {
+            transform: scale(1.1);
+            z-index: 10;
+        }
+
+        .map-unit.selected {
+            z-index: 20;
+        }
+
+        .map-unit-icon {
+            font-size: 48px;
+            filter: drop-shadow(0 0 10px currentColor);
+            position: relative;
+        }
+
+        /* 状态指示器 */
+        .status-indicator {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #050510;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .status-indicator.warning {
+            background: #feca57;
+            animation: blink 1.5s infinite;
+        }
+
+        .status-indicator.error {
+            background: #ff6b6b;
+            animation: blink 1s infinite;
+        }
+
+        .status-indicator.success {
+            background: #00ff88;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .map-unit-label {
+            font-size: 10px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 5px;
+            white-space: nowrap;
+        }
+
+        .map-unit-health {
+            width: 60px;
+            height: 4px;
+            background: #000;
+            border-radius: 2px;
+            margin-top: 3px;
+            overflow: hidden;
+        }
+
+        .map-unit-health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00d9ff);
+            transition: width 0.3s ease;
+        }
+
+        /* 选中效果 */
+        .map-unit.selected .map-unit-icon {
+            animation: selectedGlow 2s infinite;
+        }
+
+        @keyframes selectedGlow {
+            0%, 100% {
+                filter: drop-shadow(0 0 10px currentColor)
+                        drop-shadow(0 0 20px currentColor);
+            }
+            50% {
+                filter: drop-shadow(0 0 15px currentColor)
+                        drop-shadow(0 0 30px currentColor);
+            }
+        }
+
+        /* 小地图 */
+        .minimap {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 180px;
+            height: 140px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00d9ff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .minimap-header {
+            background: rgba(0, 217, 255, 0.2);
+            padding: 5px 10px;
+            font-size: 10px;
+            color: #00d9ff;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .minimap-content {
+            position: relative;
+            height: calc(100% - 24px);
+        }
+
+        .minimap-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            box-shadow: 0 0 5px currentColor;
+        }
+
+        /* 右侧信息面板 */
+        .info-panel {
+            background: rgba(15, 15, 30, 0.95);
+            border-left: 2px solid #00d9ff;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .info-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .info-card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .info-card-icon {
+            font-size: 32px;
+        }
+
+        .info-card-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #00d9ff;
+        }
+
+        .info-card-subtitle {
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        .info-card-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .stat-label {
+            font-size: 9px;
+            color: #aaa;
+            margin-bottom: 2px;
+        }
+
+        .stat-value {
+            font-size: 12px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        /* 差异对比 */
+        .diff-comparison {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .diff-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        .diff-field {
+            font-size: 11px;
+            color: #aaa;
+            min-width: 80px;
+        }
+
+        .diff-old {
+            font-size: 11px;
+            color: #ff6b6b;
+            text-decoration: line-through;
+            flex: 1;
+        }
+
+        .diff-new {
+            font-size: 11px;
+            color: #00ff88;
+            flex: 1;
+        }
+
+        /* 底部日志区域 */
+        .log-panel {
+            background: rgba(10, 10, 20, 0.95);
+            border-top: 2px solid #00d9ff;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+
+        .log-section {
+            padding: 10px 15px;
+            border-right: 1px solid rgba(0, 217, 255, 0.2);
+            overflow-y: auto;
+        }
+
+        .log-section:last-child {
+            border-right: none;
+        }
+
+        .log-header {
+            font-size: 11px;
+            color: #00d9ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .log-entry {
+            font-size: 11px;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(0, 217, 255, 0.05);
+            display: flex;
+            gap: 8px;
+        }
+
+        .log-time {
+            color: #666;
+            min-width: 70px;
+        }
+
+        .log-type {
+            font-weight: bold;
+            min-width: 60px;
+        }
+
+        .log-type.info { color: #00d9ff; }
+        .log-type.success { color: #00ff88; }
+        .log-type.warning { color: #feca57; }
+        .log-type.error { color: #ff6b6b; }
+
+        .log-message {
+            color: #ccc;
+            flex: 1;
+        }
+
+        /* 建造菜单 */
+        .build-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 15, 30, 0.98);
+            border: 2px solid #00d9ff;
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 400px;
+            z-index: 1000;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.8);
+        }
+
+        .build-menu.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .build-menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .build-menu-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #00d9ff;
+        }
+
+        .build-menu-close {
+            background: none;
+            border: none;
+            color: #ff6b6b;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .build-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .build-option {
+            background: rgba(0, 217, 255, 0.1);
+            border: 2px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .build-option:hover {
+            background: rgba(0, 217, 255, 0.2);
+            border-color: #00d9ff;
+            transform: scale(1.05);
+        }
+
+        .build-option-icon {
+            font-size: 36px;
+        }
+
+        .build-option-name {
+            font-size: 13px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .build-option-cost {
+            font-size: 11px;
+            color: #feca57;
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #00d9ff;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ff88;
+        }
+
+        /* 工具提示 */
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #00d9ff;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 11px;
+            z-index: 2000;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .tooltip-title {
+            font-weight: bold;
+            color: #00d9ff;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-desc {
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- 顶部状态栏 -->
+        <div class="hud-bar">
+            <div class="resource-counter">
+                <span class="resource-icon">⚡</span>
+                <span class="resource-count">8 资源</span>
+            </div>
+            <div class="resource-counter">
+                <span class="resource-icon">🎯</span>
+                <span class="resource-count">3 任务</span>
+            </div>
+            <div style="flex: 1;"></div>
+            <div class="game-time">
+                <span>🕐</span>
+                <span>2026-04-06 10:30</span>
+            </div>
+            <div class="notification-bell" onclick="toggleNotifications()">
+                <span>🔔</span>
+                <span class="notification-badge">3</span>
+            </div>
+        </div>
+
+        <!-- 主游戏区域 -->
+        <div class="game-area">
+            <!-- 左侧控制面板 -->
+            <div class="control-panel">
+                <div class="panel-section">
+                    <div class="panel-title">
+                        <span>🎮</span>
+                        <span>指挥命令</span>
+                    </div>
+                    <div class="action-grid">
+                        <button class="action-btn" onclick="startScoutMode()">
+                            <span class="action-btn-icon">🔭</span>
+                            <span class="action-btn-label">侦察模式</span>
+                            <span class="action-btn-hint">扫描现网资源</span>
+                        </button>
+                        <button class="action-btn" onclick="openBuildMenu()">
+                            <span class="action-btn-icon">🏗️</span>
+                            <span class="action-btn-label">建造</span>
+                            <span class="action-btn-hint">创建新资源</span>
+                        </button>
+                        <button class="action-btn" onclick="startRepairMode()">
+                            <span class="action-btn-icon">🔧</span>
+                            <span class="action-btn-label">修复</span>
+                            <span class="action-btn-hint">同步配置漂移</span>
+                        </button>
+                        <button class="action-btn" onclick="startUpgradeMode()">
+                            <span class="action-btn-icon">⬆️</span>
+                            <span class="action-btn-label">升级</span>
+                            <span class="action-btn-hint">更新资源规格</span>
+                        </button>
+                        <button class="action-btn danger" onclick="startDemolishMode()">
+                            <span class="action-btn-icon">💥</span>
+                            <span class="action-btn-label">拆除</span>
+                            <span class="action-btn-hint">删除资源</span>
+                        </button>
+                        <button class="action-btn" onclick="validateCode()">
+                            <span class="action-btn-icon">✅</span>
+                            <span class="action-btn-label">验证</span>
+                            <span class="action-btn-hint">语法检查</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <div class="panel-title">
+                        <span>📋</span>
+                        <span>待办任务</span>
+                    </div>
+                    <div class="mission-list">
+                        <div class="mission-item urgent" onclick="handleMissionClick('drift-ads')">
+                            <div class="mission-title">⚠️ 配置漂移检测</div>
+                            <div class="mission-desc">ADS集群配置与代码不一致</div>
+                        </div>
+                        <div class="mission-item" onclick="handleMissionClick('validate-code')">
+                            <div class="mission-title">📝 代码验证</div>
+                            <div class="mission-desc">5个文件需要语法检查</div>
+                        </div>
+                        <div class="mission-item" onclick="handleMissionClick('deploy-test')">
+                            <div class="mission-title">🚀 测试部署</div>
+                            <div class="mission-desc">准备在测试环境部署</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <div class="panel-title">
+                        <span>⚙️</span>
+                        <span>快捷操作</span>
+                    </div>
+                    <div class="action-grid">
+                        <button class="action-btn" onclick="exportIaC()">
+                            <span class="action-btn-icon">📤</span>
+                            <span class="action-btn-label">导出IaC</span>
+                        </button>
+                        <button class="action-btn" onclick="showHistory()">
+                            <span class="action-btn-icon">📜</span>
+                            <span class="action-btn-label">历史记录</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中间地图区域 -->
+            <div class="map-container" id="map-container">
+                <div class="map-grid"></div>
+                <div id="map-units"></div>
+
+                <!-- 小地图 -->
+                <div class="minimap">
+                    <div class="minimap-header">战术地图</div>
+                    <div class="minimap-content" id="minimap-content"></div>
+                </div>
+            </div>
+
+            <!-- 右侧信息面板 -->
+            <div class="info-panel">
+                <div class="info-card" id="unit-info-card">
+                    <div class="info-card-header">
+                        <span class="info-card-icon">🏢</span>
+                        <div>
+                            <div class="info-card-title">生产ADS集群</div>
+                            <div class="info-card-subtitle">ads-001 · s2.large.2</div>
+                        </div>
+                    </div>
+                    <div class="info-card-stats">
+                        <div class="stat-item">
+                            <div class="stat-label">健康状态</div>
+                            <div class="stat-value" style="color: #feca57;">⚠️ 漂移</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">运行时间</div>
+                            <div class="stat-value">45天</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">节点数量</div>
+                            <div class="stat-value">3个</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">CPU使用率</div>
+                            <div class="stat-value">67%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <div class="panel-title" style="margin-bottom: 10px;">
+                        <span>🔍</span>
+                        <span>配置差异</span>
+                    </div>
+                    <div class="diff-comparison">
+                        <div class="diff-row">
+                            <span class="diff-field">规格</span>
+                            <span class="diff-old">s2.large.2</span>
+                            <span class="diff-new">s2.xlarge.4</span>
+                        </div>
+                        <div class="diff-row">
+                            <span class="diff-field">节点数</span>
+                            <span class="diff-old">2</span>
+                            <span class="diff-new">3</span>
+                        </div>
+                        <div class="diff-row">
+                            <span class="diff-field">存储</span>
+                            <span class="diff-old">100GB</span>
+                            <span class="diff-new">200GB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <div class="panel-title" style="margin-bottom: 10px;">
+                        <span>⚡</span>
+                        <span>操作</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button class="action-btn" onclick="syncToCode()" style="width: 100%;">
+                            <span style="font-size: 16px;">🔄</span>
+                            <span>同步到代码</span>
+                        </button>
+                        <button class="action-btn danger" onclick="syncToInfra()" style="width: 100%;">
+                            <span style="font-size: 16px;">⚠️</span>
+                            <span>回滚现网</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部日志区域 -->
+        <div class="log-panel">
+            <div class="log-section">
+                <div class="log-header">📋 战斗日志</div>
+                <div id="battle-log">
+                    <div class="log-entry">
+                        <span class="log-time">10:28:45</span>
+                        <span class="log-type warning">⚠️ 警告</span>
+                        <span class="log-message">检测到配置漂移：ads-001</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">10:27:30</span>
+                        <span class="log-type info">📡 侦察</span>
+                        <span class="log-message">完成现网资源扫描：发现8个资源</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">10:25:15</span>
+                        <span class="log-type success">✅ 成功</span>
+                        <span class="log-message">IaC代码导出完成</span>
+                    </div>
+                </div>
+            </div>
+            <div class="log-section">
+                <div class="log-header">💬 系统消息</div>
+                <div id="system-log">
+                    <div class="log-entry">
+                        <span class="log-time">10:30:00</span>
+                        <span class="log-type info">ℹ️ 信息</span>
+                        <span class="log-message">欢迎使用基础设施指挥官</span>
+                    </div>
+                    <div class="log-entry">
+                        <span class="log-time">10:29:50</span>
+                        <span class="log-type success">✅ 准备就绪</span>
+                        <span class="log-message">WebSocket已连接</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 建造菜单 -->
+    <div class="build-menu" id="build-menu">
+        <div class="build-menu-header">
+            <div class="build-menu-title">🏗️ 建造新资源</div>
+            <button class="build-menu-close" onclick="closeBuildMenu()">✕</button>
+        </div>
+        <div class="build-options">
+            <div class="build-option" onclick="buildResource('ads')">
+                <span class="build-option-icon">🏢</span>
+                <span class="build-option-name">ADS集群</span>
+                <span class="build-option-cost">¥500/月</span>
+            </div>
+            <div class="build-option" onclick="buildResource('database')">
+                <span class="build-option-icon">🗄️</span>
+                <span class="build-option-name">数据库</span>
+                <span class="build-option-cost">¥300/月</span>
+            </div>
+            <div class="build-option" onclick="buildResource('cache')">
+                <span class="build-option-icon">💾</span>
+                <span class="build-option-name">缓存</span>
+                <span class="build-option-cost">¥150/月</span>
+            </div>
+            <div class="build-option" onclick="buildResource('load_balancer')">
+                <span class="build-option-icon">⚖️</span>
+                <span class="build-option-name">负载均衡</span>
+                <span class="build-option-cost">¥200/月</span>
+            </div>
+            <div class="build-option" onclick="buildResource('vpc')">
+                <span class="build-option-icon">🌐</span>
+                <span class="build-option-name">VPC网络</span>
+                <span class="build-option-cost">¥100/月</span>
+            </div>
+            <div class="build-option" onclick="buildResource('security_group')">
+                <span class="build-option-icon">🛡️</span>
+                <span class="build-option-name">安全组</span>
+                <span class="build-option-cost">免费</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 资源类型配置
+        const RESOURCE_TYPES = {
+            'ads': { icon: '🏢', color: '#3498db', label: 'ADS集群' },
+            'config': { icon: '⚙️', color: '#f39c12', label: '配置' },
+            'vpc': { icon: '🌐', color: '#9b59b6', label: 'VPC' },
+            'security_group': { icon: '🛡️', color: '#e74c3c', label: '安全组' },
+            'load_balancer': { icon: '⚖️', color: '#1abc9c', label: '负载均衡' },
+            'database': { icon: '🗄️', color: '#e67e22', label: '数据库' },
+            'cache': { icon: '💾', color: '#16a085', label: '缓存' }
+        };
+
+        // 当前地图上的资源
+        let mapResources = [
+            { id: 'ads-001', type: 'ads', name: '生产ADS集群', status: 'warning', x: 200, y: 150, health: 85 },
+            { id: 'vpc-001', type: 'vpc', name: '生产VPC', status: 'success', x: 400, y: 150, health: 100 },
+            { id: 'sg-001', type: 'security_group', name: 'Web安全组', status: 'success', x: 550, y: 150, health: 100 },
+            { id: 'lb-001', type: 'load_balancer', name: '公网负载均衡', status: 'warning', x: 375, y: 300, health: 70 },
+            { id: 'db-001', type: 'database', name: '主数据库', status: 'success', x: 200, y: 300, health: 100 },
+            { id: 'cache-001', type: 'cache', name: 'Redis缓存', status: 'success', x: 550, y: 300, health: 100 },
+            { id: 'sg-002', type: 'security_group', name: 'API安全组', status: 'success', x: 250, y: 450, health: 100 },
+            { id: 'config-001', type: 'config', name: '应用配置', status: 'success', x: 500, y: 450, health: 100 }
+        ];
+
+        let selectedUnit = null;
+        let currentMode = 'normal'; // normal, scout, build, repair, upgrade, demolish
+
+        // 初始化地图
+        function initMap() {
+            renderMapUnits();
+            renderMinimap();
+        }
+
+        // 渲染地图单位
+        function renderMapUnits() {
+            const container = document.getElementById('map-units');
+            container.innerHTML = mapResources.map(resource => {
+                const type = RESOURCE_TYPES[resource.type];
+                const statusClass = resource.status;
+                const selectedClass = selectedUnit === resource.id ? 'selected' : '';
+
+                return `
+                    <div class="map-unit ${selectedClass}"
+                         style="left: ${resource.x}px; top: ${resource.y}px; color: ${type.color};"
+                         onclick="selectUnit('${resource.id}')"
+                         ondblclick="openUnitDetail('${resource.id}')">
+                        <div class="map-unit-icon">${type.icon}</div>
+                        ${resource.status !== 'success' ? `<div class="status-indicator ${resource.status}">${resource.status === 'warning' ? '!' : '✕'}</div>` : ''}
+                        <div class="map-unit-label">${resource.name}</div>
+                        <div class="map-unit-health">
+                            <div class="map-unit-health-fill" style="width: ${resource.health}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 渲染小地图
+        function renderMinimap() {
+            const container = document.getElementById('minimap-content');
+            const mapWidth = 800;
+            const mapHeight = 600;
+            const minimapWidth = 180;
+            const minimapHeight = 116;
+
+            container.innerHTML = mapResources.map(resource => {
+                const type = RESOURCE_TYPES[resource.type];
+                const x = (resource.x / mapWidth) * minimapWidth;
+                const y = (resource.y / mapHeight) * minimapHeight;
+
+                return `<div class="minimap-dot" style="left: ${x}px; top: ${y}px; background: ${type.color};"></div>`;
+            }).join('');
+        }
+
+        // 选择单位
+        function selectUnit(resourceId) {
+            selectedUnit = resourceId;
+            renderMapUnits();
+            updateInfoPanel(resourceId);
+        }
+
+        // 更新信息面板
+        function updateInfoPanel(resourceId) {
+            const resource = mapResources.find(r => r.id === resourceId);
+            if (!resource) return;
+
+            const type = RESOURCE_TYPES[resource.type];
+
+            // 更新单位信息卡片
+            document.querySelector('#unit-info-card .info-card-icon').textContent = type.icon;
+            document.querySelector('#unit-info-card .info-card-title').textContent = resource.name;
+            document.querySelector('#unit-info-card .info-card-subtitle').textContent = `${resource.id} · ${type.label}`;
+
+            // 根据状态显示不同的信息
+            if (resource.status === 'warning') {
+                document.querySelector('#unit-info-card .stat-value').textContent = '⚠️ 漂移';
+                document.querySelector('#unit-info-card .stat-value').style.color = '#feca57';
+            } else {
+                document.querySelector('#unit-info-card .stat-value').textContent = '✅ 正常';
+                document.querySelector('#unit-info-card .stat-value').style.color = '#00ff88';
+            }
+        }
+
+        // 双击打开详情
+        function openUnitDetail(resourceId) {
+            console.log('Opening detail for:', resourceId);
+            // 可以打开模态框显示详细信息
+        }
+
+        // 开始侦察模式
+        function startScoutMode() {
+            currentMode = 'scout';
+            addLog('info', '侦察', '开始扫描现网资源...');
+            addLog('success', '侦察', '发现8个活跃资源');
+
+            // 模拟扫描动画
+            const mapContainer = document.querySelector('.map-container');
+            mapContainer.style.background = 'radial-gradient(circle at center, rgba(0, 217, 255, 0.1) 0%, transparent 70%)';
+
+            setTimeout(() => {
+                mapContainer.style.background = '#050510';
+                currentMode = 'normal';
+            }, 2000);
+        }
+
+        // 打开建造菜单
+        function openBuildMenu() {
+            currentMode = 'build';
+            document.getElementById('build-menu').classList.add('active');
+        }
+
+        // 关闭建造菜单
+        function closeBuildMenu() {
+            currentMode = 'normal';
+            document.getElementById('build-menu').classList.remove('active');
+        }
+
+        // 建造资源
+        function buildResource(type) {
+            closeBuildMenu();
+            addLog('info', '建造', `开始建造${RESOURCE_TYPES[type].label}...`);
+
+            // 模拟建造过程
+            const newResource = {
+                id: `${type}-${Date.now()}`,
+                type: type,
+                name: `新${RESOURCE_TYPES[type].label}`,
+                status: 'success',
+                x: Math.random() * 600 + 100,
+                y: Math.random() * 400 + 100,
+                health: 100
+            };
+
+            mapResources.push(newResource);
+            renderMapUnits();
+            renderMinimap();
+
+            setTimeout(() => {
+                addLog('success', '建造', `${RESOURCE_TYPES[type].label}建造完成`);
+            }, 1000);
+        }
+
+        // 开始修复模式
+        function startRepairMode() {
+            currentMode = 'repair';
+            addLog('info', '修复', '进入修复模式 - 点击需要修复的资源');
+        }
+
+        // 开始升级模式
+        function startUpgradeMode() {
+            currentMode = 'upgrade';
+            addLog('info', '升级', '进入升级模式 - 点击需要升级的资源');
+        }
+
+        // 开始拆除模式
+        function startDemolishMode() {
+            currentMode = 'demolish';
+            addLog('warning', '拆除', '进入拆除模式 - 点击要删除的资源');
+        }
+
+        // 同步到代码
+        function syncToCode() {
+            if (selectedUnit) {
+                addLog('info', '同步', `将 ${selectedUnit} 的配置同步到代码...`);
+                setTimeout(() => {
+                    addLog('success', '同步', `${selectedUnit} 代码已更新`);
+                    // 更新资源状态
+                    const resource = mapResources.find(r => r.id === selectedUnit);
+                    if (resource) {
+                        resource.status = 'success';
+                        renderMapUnits();
+                        updateInfoPanel(selectedUnit);
+                    }
+                }, 1000);
+            }
+        }
+
+        // 回滚现网
+        function syncToInfra() {
+            if (selectedUnit) {
+                if (confirm('确定要回滚现网配置吗？这将重新应用代码中的配置。')) {
+                    addLog('warning', '回滚', `开始回滚 ${selectedUnit} 的现网配置...`);
+                    setTimeout(() => {
+                        addLog('success', '回滚', `${selectedUnit} 已回滚到代码配置`);
+                        const resource = mapResources.find(r => r.id === selectedUnit);
+                        if (resource) {
+                            resource.status = 'success';
+                            renderMapUnits();
+                            updateInfoPanel(selectedUnit);
+                        }
+                    }, 1000);
+                }
+            }
+        }
+
+        // 验证代码
+        function validateCode() {
+            addLog('info', '验证', '开始语法检查...');
+            setTimeout(() => {
+                addLog('success', '验证', '所有文件语法正确');
+            }, 1500);
+        }
+
+        // 导出IaC
+        function exportIaC() {
+            addLog('info', '导出', '正在生成IaC代码...');
+            setTimeout(() => {
+                addLog('success', '导出', 'IaC代码已导出到 export/ 目录');
+            }, 1000);
+        }
+
+        // 显示历史
+        function showHistory() {
+            alert('历史记录功能开发中...');
+        }
+
+        // 切换通知
+        function toggleNotifications() {
+            alert('通知面板：\n⚠️ 3个配置漂移\n📝 1个代码验证待处理\n🚀 1个待部署任务');
+        }
+
+        // 处理任务点击
+        function handleMissionClick(missionId) {
+            switch(missionId) {
+                case 'drift-ads':
+                    selectUnit('ads-001');
+                    addLog('info', '任务', '查看ADS集群配置漂移详情');
+                    break;
+                case 'validate-code':
+                    validateCode();
+                    break;
+                case 'deploy-test':
+                    addLog('info', '任务', '准备测试部署...');
+                    break;
+            }
+        }
+
+        // 添加日志
+        function addLog(type, logType, message) {
+            const logContainer = document.getElementById('battle-log');
+            const time = new Date().toLocaleTimeString('zh-CN');
+
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-type ${type}">${logType}</span>
+                <span class="log-message">${message}</span>
+            `;
+
+            logContainer.insertBefore(logEntry, logContainer.firstChild);
+
+            // 限制日志条目数量
+            while (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        // 初始化
+        window.onload = function() {
+            initMap();
+            console.log('Infrastructure Commander loaded');
+        };
+
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case 'Escape':
+                    closeBuildMenu();
+                    currentMode = 'normal';
+                    break;
+                case 'b':
+                    openBuildMenu();
+                    break;
+                case 's':
+                    startScoutMode();
+                    break;
+                case 'r':
+                    startRepairMode();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

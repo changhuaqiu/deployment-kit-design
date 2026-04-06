@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CityBuilder - IaC部署可视化 (参考Digger风格)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f8f9fa;
+            color: #212529;
+            line-height: 1.6;
+        }
+
+        /* 顶部导航栏 - Digger风格 */
+        .navbar {
+            background: #fff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: #212529;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            font-size: 24px;
+        }
+
+        .navbar-center {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-tab {
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6c757d;
+            transition: all 0.2s;
+            background: transparent;
+            border: none;
+        }
+
+        .nav-tab:hover {
+            background: #f8f9fa;
+            color: #212529;
+        }
+
+        .nav-tab.active {
+            background: #e7f5ff;
+            color: #1971c2;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .env-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e7f5ff;
+            color: #1971c2;
+        }
+
+        /* 主内容区域 */
+        .main-content {
+            display: flex;
+            height: calc(100vh - 64px);
+        }
+
+        /* 左侧边栏 - 资源树 */
+        .sidebar {
+            width: 280px;
+            background: #fff;
+            border-right: 1px solid #e9ecef;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 14px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .resource-tree {
+            padding: 8px;
+        }
+
+        .tree-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            margin-bottom: 2px;
+        }
+
+        .tree-item:hover {
+            background: #f8f9fa;
+        }
+
+        .tree-item.selected {
+            background: #e7f5ff;
+            color: #1971c2;
+            font-weight: 500;
+        }
+
+        .tree-item.has-children {
+            padding-left: 8px;
+        }
+
+        .tree-children {
+            margin-left: 20px;
+        }
+
+        .tree-icon {
+            font-size: 16px;
+        }
+
+        .tree-status {
+            margin-left: auto;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-success {
+            background: #40c057;
+        }
+
+        .status-warning {
+            background: #fab005;
+        }
+
+        .status-error {
+            background: #fa5252;
+        }
+
+        /* 中间主区域 */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f8f9fa;
+        }
+
+        /* 工具栏 */
+        .toolbar {
+            background: #fff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 12px 16px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .toolbar-btn {
+            padding: 6px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: #fff;
+            color: #495057;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .toolbar-btn:hover {
+            background: #f8f9fa;
+            border-color: #adb5bd;
+        }
+
+        .toolbar-btn.primary {
+            background: #228be6;
+            border-color: #228be6;
+            color: #fff;
+        }
+
+        .toolbar-btn.primary:hover {
+            background: #1971c2;
+            border-color: #1971c2;
+        }
+
+        .toolbar-divider {
+            width: 1px;
+            height: 24px;
+            background: #dee2e6;
+            margin: 0 8px;
+        }
+
+        /* 可视化区域 */
+        .visualization-area {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 16px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #212529;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-body {
+            padding: 16px;
+        }
+
+        /* 架构图 */
+        .architecture-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .diagram-section {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-icon {
+            font-size: 20px;
+        }
+
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .resource-card {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .resource-card:hover {
+            border-color: #339af0;
+            box-shadow: 0 2px 8px rgba(51, 154, 240, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .resource-card.has-drift {
+            border-color: #fab005;
+            background: #fff9db;
+        }
+
+        .resource-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .resource-icon {
+            font-size: 24px;
+        }
+
+        .resource-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .resource-type {
+            font-size: 12px;
+            color: #868e96;
+            margin-bottom: 8px;
+        }
+
+        .resource-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .status-success {
+            background: #d3f9d8;
+            color: #2b8a3e;
+        }
+
+        .status-warning {
+            background: #fff3bf;
+            color: #e67700;
+        }
+
+        .drift-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #ffe3e3;
+            color: #c92a2a;
+            font-size: 11px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+
+        /* 连接线 */
+        .connection-lines {
+            position: relative;
+        }
+
+        .connection-line {
+            position: absolute;
+            height: 2px;
+            background: #adb5bd;
+            top: 50%;
+            left: 0;
+            right: 0;
+        }
+
+        .connection-line::after {
+            content: '↓';
+            position: absolute;
+            right: -10px;
+            top: -10px;
+            font-size: 16px;
+            color: #adb5bd;
+        }
+
+        /* 右侧详情面板 */
+        .details-panel {
+            width: 320px;
+            background: #fff;
+            border-left: 1px solid #e9ecef;
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            padding: 16px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #868e96;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .close-btn:hover {
+            color: #495057;
+        }
+
+        .panel-content {
+            padding: 16px;
+        }
+
+        /* Tab切换 */
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 16px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #868e96;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: #495057;
+        }
+
+        .tab.active {
+            color: #228be6;
+            border-bottom-color: #228be6;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 属性列表 */
+        .property-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .property-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        .property-label {
+            font-size: 13px;
+            color: #868e96;
+        }
+
+        .property-value {
+            font-size: 13px;
+            color: #212529;
+            font-weight: 500;
+        }
+
+        /* Diff视图 */
+        .diff-view {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .diff-item {
+            padding: 8px 12px;
+            border-left: 3px solid #adb5bd;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .diff-item.added {
+            border-left-color: #40c057;
+            background: #ebfbee;
+        }
+
+        .diff-item.changed {
+            border-left-color: #fab005;
+            background: #fff9db;
+        }
+
+        .diff-field {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .diff-values {
+            display: flex;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .diff-old {
+            color: #fa5252;
+            text-decoration: line-through;
+        }
+
+        .diff-new {
+            color: #40c057;
+        }
+
+        /* 操作按钮 */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #339af0;
+            border-radius: 6px;
+            background: #228be6;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #1971c2;
+            border-color: #1971c2;
+        }
+
+        .action-btn.secondary {
+            background: #fff;
+            color: #228be6;
+        }
+
+        .action-btn.secondary:hover {
+            background: #f8f9fa;
+        }
+
+        .action-btn.danger {
+            background: #fff;
+            border-color: #fa5252;
+            color: #fa5252;
+        }
+
+        .action-btn.danger:hover {
+            background: #fff5f5;
+        }
+
+        /* 代码预览 */
+        .code-preview {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .code-comment {
+            color: #868e96;
+        }
+
+        .code-keyword {
+            color: #d6336c;
+        }
+
+        .code-string {
+            color: #2f9e44;
+        }
+
+        .code-number {
+            color: #6610f2;
+        }
+
+        /* Toast通知 */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 9999;
+        }
+
+        .toast {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-left: 4px solid #228be6;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease-out;
+            min-width: 300px;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #212529;
+            margin-bottom: 4px;
+        }
+
+        .toast-message {
+            font-size: 13px;
+            color: #495057;
+        }
+
+        /* 响应式 */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 240px;
+            }
+            .details-panel {
+                width: 280px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            .details-panel {
+                position: fixed;
+                right: 0;
+                top: 64px;
+                bottom: 0;
+                width: 100%;
+                max-width: 400px;
+                z-index: 1000;
+                transform: translateX(100%);
+                transition: transform 0.3s;
+            }
+            .details-panel.active {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <div class="logo">
+                <span class="logo-icon">🏙️</span>
+                <span>CityBuilder</span>
+            </div>
+        </div>
+
+        <div class="navbar-center">
+            <button class="nav-tab active" onclick="switchTab('overview')">📊 概览</button>
+            <button class="nav-tab" onclick="switchTab('resources')">🏗️ 资源</button>
+            <button class="nav-tab" onclick="switchTab('deployments')">🚀 部署</button>
+            <button class="nav-tab" onclick="switchTab('drifts')">⚠️ 漂移</button>
+        </div>
+
+        <div class="navbar-right">
+            <span class="env-badge">生产环境</span>
+        </div>
+    </nav>
+
+    <!-- 主内容区域 -->
+    <div class="main-content">
+        <!-- 左侧资源树 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">📍 资源树</div>
+            <div class="resource-tree">
+                <div class="tree-item" onclick="selectResource('all')">
+                    <span class="tree-icon">📦</span>
+                    <span>订单应用</span>
+                </div>
+
+                <div class="tree-item has-children" onclick="toggleChildren(this)">
+                    <span class="tree-icon">🏢</span>
+                    <span>商业街区</span>
+                    <span class="tree-status"><span class="status-dot status-success"></span></span>
+                </div>
+                <div class="tree-children" style="display: none;">
+                    <div class="tree-item" onclick="selectResource('order-api')">
+                        <span class="tree-icon">🏢</span>
+                        <span>order-api</span>
+                        <span class="tree-status"><span class="status-dot status-warning"></span></span>
+                    </div>
+                    <div class="tree-item" onclick="selectResource('payment-service')">
+                        <span class="tree-icon">🏢</span>
+                        <span>payment-service</span>
+                        <span class="tree-status"><span class="status-dot status-success"></span></span>
+                    </div>
+                    <div class="tree-item" onclick="selectResource('notification-service')">
+                        <span class="tree-icon">🏢</span>
+                        <span>notification-service</span>
+                        <span class="tree-status"><span class="status-dot status-success"></span></span>
+                    </div>
+                </div>
+
+                <div class="tree-item has-children" onclick="toggleChildren(this)">
+                    <span class="tree-icon">🏦</span>
+                    <span>数据仓储区</span>
+                    <span class="tree-status"><span class="status-dot status-warning"></span></span>
+                </div>
+                <div class="tree-children" style="display: none;">
+                    <div class="tree-item" onclick="selectResource('mysql-master')">
+                        <span class="tree-icon">🏦</span>
+                        <span>mysql-master</span>
+                        <span class="tree-status"><span class="status-dot status-warning"></span></span>
+                    </div>
+                    <div class="tree-item" onclick="selectResource('mysql-replica-1')">
+                        <span class="tree-icon">🏦</span>
+                        <span>mysql-replica-1</span>
+                        <span class="tree-status"><span class="status-dot status-success"></span></span>
+                    </div>
+                    <div class="tree-item" onclick="selectResource('redis-cache')">
+                        <span class="tree-icon">🏪</span>
+                        <span>redis-cache</span>
+                        <span class="tree-status"><span class="status-dot status-success"></span></span>
+                    </div>
+                </div>
+
+                <div class="tree-item has-children" onclick="toggleChildren(this)">
+                    <span class="tree-icon">🌐</span>
+                    <span>网络交通区</span>
+                    <span class="tree-status"><span class="status-dot status-success"></span></span>
+                </div>
+                <div class="tree-children" style="display: none;">
+                    <div class="tree-item" onclick="selectResource('vpc')">
+                        <span class="tree-icon">🌐</span>
+                        <span>vpc-main</span>
+                    </div>
+                    <div class="tree-item" onclick="selectResource('loadbalancer')">
+                        <span class="tree-icon">⚖️</span>
+                        <span>alb-public</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 中间主区域 -->
+        <main class="main-area">
+            <!-- 工具栏 -->
+            <div class="toolbar">
+                <button class="toolbar-btn" onclick="startCensus()">
+                    <span>🔭</span>
+                    <span>城市普查</span>
+                </button>
+                <button class="toolbar-btn" onclick="checkDrift()">
+                    <span>🔍</span>
+                    <span>违建稽查</span>
+                </button>
+                <div class="toolbar-divider"></div>
+                <button class="toolbar-btn" onclick="generatePlan()">
+                    <span>📋</span>
+                    <span>执行计划</span>
+                </button>
+                <button class="toolbar-btn secondary" onclick="showDiff()">
+                    <span>⚖️</span>
+                    <span>对比差异</span>
+                </button>
+                <div class="toolbar-divider"></div>
+                <button class="toolbar-btn primary" onclick="deploy()">
+                    <span>🚀</span>
+                    <span>开始部署</span>
+                </button>
+            </div>
+
+            <!-- 可视化区域 -->
+            <div class="visualization-area">
+                <!-- 架构总览卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <span>🏗️</span>
+                            <span>基础设施架构总览</span>
+                        </div>
+                        <div style="font-size: 14px; color: #868e96;">
+                            共 12 个资源 · 2 个配置漂移
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="architecture-diagram">
+                            <!-- 商业街区 -->
+                            <div class="diagram-section">
+                                <div class="section-title">
+                                    <span class="section-icon">🏢</span>
+                                    <span>商业街区 - 业务逻辑服务</span>
+                                </div>
+                                <div class="resource-grid">
+                                    <div class="resource-card has-drift" onclick="showResourceDetails('order-api')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🏢</span>
+                                            <span class="resource-name">order-api</span>
+                                        </div>
+                                        <div class="resource-type">Component: Service</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                        <div class="drift-badge">⚠️ 配置漂移</div>
+                                    </div>
+
+                                    <div class="resource-card" onclick="showResourceDetails('payment-service')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🏢</span>
+                                            <span class="resource-name">payment-service</span>
+                                        </div>
+                                        <div class="resource-type">Component: Service</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+
+                                    <div class="resource-card" onclick="showResourceDetails('notification-service')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🏢</span>
+                                            <span class="resource-name">notification-service</span>
+                                        </div>
+                                        <div class="resource-type">Component: Service</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+
+                                    <div class="resource-card" onclick="showResourceDetails('batch-processor')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🏭</span>
+                                            <span class="resource-name">batch-processor</span>
+                                        </div>
+                                        <div class="resource-type">Component: Job</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 连接线 -->
+                            <div style="text-align: center; color: #adb5bd; font-size: 24px;">↓</div>
+
+                            <!-- 数据仓储区 -->
+                            <div class="diagram-section">
+                                <div class="section-title">
+                                    <span class="section-icon">🏦</span>
+                                    <span>数据仓储区 - 存储和缓存</span>
+                                </div>
+                                <div class="resource-grid">
+                                    <div class="resource-card has-drift" onclick="showResourceDetails('mysql-master')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🏦</span>
+                                            <span class="resource-name">mysql-master</span>
+                                        </div>
+                                        <div class="resource-type">Component: RDS</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                        <div class="drift-badge">⚠️ 配置漂移</div>
+                                    </div>
+
+                                    <div class="resource-card" onclick="showResourceDetails('mysql-replica-1')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🏦</span>
+                                            <span class="resource-name">mysql-replica-1</span>
+                                        </div>
+                                        <div class="resource-type">Component: RDS Replica</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+
+                                    <div class="resource-card" onclick="showResourceDetails('redis-cache')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🏪</span>
+                                            <span class="resource-name">redis-cache</span>
+                                        </div>
+                                        <div class="resource-type">Component: Redis</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+
+                                    <div class="resource-card" onclick="showResourceDetails('kafka-queue')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🚂</span>
+                                            <span class="resource-name">kafka-queue</span>
+                                        </div>
+                                        <div class="resource-type">Component: Kafka</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 连接线 -->
+                            <div style="text-align: center; color: #adb5bd; font-size: 24px;">↓</div>
+
+                            <!-- 网络交通区 -->
+                            <div class="diagram-section">
+                                <div class="section-title">
+                                    <span class="section-icon">🌐</span>
+                                    <span>网络交通区 - 网络和安全</span>
+                                </div>
+                                <div class="resource-grid">
+                                    <div class="resource-card" onclick="showResourceDetails('vpc')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🌐</span>
+                                            <span class="resource-name">vpc-main</span>
+                                        </div>
+                                        <div class="resource-type">VPC (10.0.0.0/16)</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+
+                                    <div class="resource-card" onclick="showResourceDetails('loadbalancer')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">⚖️</span>
+                                            <span class="resource-name">alb-public</span>
+                                        </div>
+                                        <div class="resource-type">Application Load Balancer</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+
+                                    <div class="resource-card" onclick="showResourceDetails('security-group')">
+                                        <div class="resource-card-header">
+                                            <span class="resource-icon">🛡️</span>
+                                            <span class="resource-name">sg-public</span>
+                                        </div>
+                                        <div class="resource-type">Security Group</div>
+                                        <div class="resource-status status-success">运行中</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧详情面板 -->
+        <aside class="details-panel" id="details-panel">
+            <div class="panel-header">
+                <div class="panel-title">资源详情</div>
+                <button class="close-btn" onclick="closePanel()">×</button>
+            </div>
+            <div class="panel-content">
+                <!-- Tab切换 -->
+                <div class="tabs">
+                    <button class="tab active" onclick="switchDetailTab('properties')">属性</button>
+                    <button class="tab" onclick="switchDetailTab('diff')">差异</button>
+                    <button class="tab" onclick="switchDetailTab('code')">代码</button>
+                </div>
+
+                <!-- 属性Tab -->
+                <div class="tab-content active" id="tab-properties">
+                    <div style="margin-bottom: 16px;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">🏦</div>
+                        <div style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">mysql-master</div>
+                        <div style="font-size: 13px; color: #868e96;">Component: RDS MySQL</div>
+                    </div>
+
+                    <div class="property-list">
+                        <div class="property-item">
+                            <span class="property-label">规格</span>
+                            <span class="property-value">8核32GB</span>
+                        </div>
+                        <div class="property-item">
+                            <span class="property-label">存储</span>
+                            <span class="property-value">200GB SSD</span>
+                        </div>
+                        <div class="property-item">
+                            <span class="property-label">可用区</span>
+                            <span class="property-value">cn-north-4a</span>
+                        </div>
+                        <div class="property-item">
+                            <span class="property-label">状态</span>
+                            <span class="property-value" style="color: #e67700;">⚠️ 配置漂移</span>
+                        </div>
+                        <div class="property-item">
+                            <span class="property-label">月费用</span>
+                            <span class="property-value">¥1,200</span>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="syncToBlueprint()">🔄 同步到蓝图</button>
+                        <button class="action-btn danger" onclick="rollbackInfra()">⚠️ 回滚现网</button>
+                    </div>
+                </div>
+
+                <!-- 差异Tab -->
+                <div class="tab-content" id="tab-diff">
+                    <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">⚠️ 检测到2处配置差异</div>
+
+                    <div class="diff-view">
+                        <div class="diff-item changed">
+                            <div class="diff-field">实例规格</div>
+                            <div class="diff-values">
+                                <span class="diff-old">s2.large.2 (4核16GB)</span>
+                                <span>→</span>
+                                <span class="diff-new">s2.xlarge.4 (8核32GB)</span>
+                            </div>
+                        </div>
+
+                        <div class="diff-item changed">
+                            <div class="diff-field">存储空间</div>
+                            <div class="diff-values">
+                                <span class="diff-old">100GB</span>
+                                <span>→</span>
+                                <span class="diff-new">200GB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="action-btn" onclick="syncToBlueprint()">🔄 同步到蓝图</button>
+                        <button class="action-btn danger" onclick="rollbackInfra()">⚠️ 回滚现网</button>
+                    </div>
+                </div>
+
+                <!-- 代码Tab -->
+                <div class="tab-content" id="tab-code">
+                    <div class="code-preview">
+<span class="code-comment"># 主数据库 - Component Definition</span>
+<span class="code-keyword">resource</span> <span class="code-string">"huaweicloud_rds_instance"</span> <span class="code-string">"master"</span> {
+  <span class="code-keyword">name</span>        = <span class="code-string">"mysql-master"</span>
+  <span class="code-keyword">flavor</span>      = <span class="code-string">"s2.large.2"</span>  <span class="code-comment"># 📝 与现网不一致: s2.xlarge.4</span>
+  <span class="code-keyword">volume</span>      = {
+    <span class="code-keyword">size</span> = <span class="code-number">100</span>  <span class="code-comment"># 📝 与现网不一致: 200</span>
+  }
+  <span class="code-keyword">availability_zone</span> = <span class="code-string">"cn-north-4a"</span>
+
+  <span class="code-keyword">backup_strategy</span> = {
+    <span class="code-keyword">start_time</span> = <span class="code-string">"02:00"</span>
+    <span class="code-keyword">keep_days</span> = <span class="code-number">7</span>
+  }
+
+  <span class="code-keyword">tags</span> = {
+    <span class="code-keyword">Environment</span> = <span class="code-string">"production"</span>
+    <span class="code-keyword">ManagedBy</span> = <span class="code-string">"citybuilder"</span>
+  }
+}
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Toast容器 -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // Tab切换
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // 资源树展开/收起
+        function toggleChildren(element) {
+            const children = element.nextElementSibling;
+            if (children && children.classList.contains('tree-children')) {
+                children.style.display = children.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        // 选择资源
+        function selectResource(resourceId) {
+            document.querySelectorAll('.tree-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+            showResourceDetails(resourceId);
+        }
+
+        // 显示资源详情
+        function showResourceDetails(resourceId) {
+            const panel = document.getElementById('details-panel');
+            panel.classList.add('active');
+            showToast('资源已选中', `正在查看 ${getResourceName(resourceId)} 的详细信息`);
+        }
+
+        function getResourceName(resourceId) {
+            const names = {
+                'order-api': 'order-api',
+                'mysql-master': 'mysql-master',
+                'payment-service': 'payment-service'
+            };
+            return names[resourceId] || resourceId;
+        }
+
+        // 关闭面板
+        function closePanel() {
+            document.getElementById('details-panel').classList.remove('active');
+        }
+
+        // 详情Tab切换
+        function switchDetailTab(tabId) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+        }
+
+        // 操作按钮
+        function startCensus() {
+            showToast('🔭 开始城市普查', '正在扫描现网资源并生成城市蓝图...\n\n预计扫描时间：2分钟');
+        }
+
+        function checkDrift() {
+            showToast('🔍 违建稽查报告', '发现 2 个建筑存在配置漂移\n\n点击高亮的建筑查看详情');
+        }
+
+        function generatePlan() {
+            showToast('📋 生成执行计划', '正在分析变更影响...\n\n影响范围：2个街区\n预计时间：15分钟');
+        }
+
+        function showDiff() {
+            showToast('⚖️ 对比差异', '正在加载差异对比视图...');
+        }
+
+        function deploy() {
+            showToast('🚀 开始部署', '当前阶段：沙盘推演（测试环境）\n\n进度：67%\n\n完成后将进入：试通车');
+        }
+
+        function syncToBlueprint() {
+            showToast('🔄 同步到蓝图', '将建筑配置更新到城市蓝图（IaC代码）\n\n这将创建一个新的蓝图版本');
+        }
+
+        function rollbackInfra() {
+            if (confirm('⚠️ 确定要回滚现网配置吗？\n\n这将把建筑恢复到蓝图定义的配置\n\n⚠️ 警告：可能导致服务中断')) {
+                showToast('✅ 回滚计划已提交', '回滚计划已进入施工许可流程');
+                closePanel();
+            }
+        }
+
+        // Toast通知
+        function showToast(title, message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message.replace(/\n/g, '<br>')}</div>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closePanel();
+            }
+        });
+    </script>
+</body>
+</html>
