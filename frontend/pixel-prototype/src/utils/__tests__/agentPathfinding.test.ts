@@ -17,7 +17,7 @@ describe('Agent Pathfinding', () => {
     expect(path[0]).toEqual({ x: 100, y: 100 })
   })
 
-  it('calculates path with obstacles (simple implementation)', () => {
+  it('ignores obstacles in simple implementation', () => {
     const agent = { position: { mapX: 100, mapY: 100 } }
     const target = {
       id: 'target-1',

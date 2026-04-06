@@ -1,7 +1,4 @@
-export interface Point {
-  x: number
-  y: number
-}
+import type { Point } from './mapCoordinates'
 
 interface Agent {
   position: { mapX: number; mapY: number }
@@ -12,9 +9,16 @@ interface Building {
   position: { x: number; y: number; width: number; height: number }
 }
 
+/**
+ * Calculates path from agent to building entrance
+ * TODO: Implement obstacle avoidance using allBuildings parameter
+ * Current: Direct line path (start → end)
+ * @returns Array of points from agent to building center-bottom
+ */
 export function calculateAgentPath(
   agent: Agent,
   targetBuilding: Building,
+  /** @param allBuildings - All buildings in the scene (reserved for future obstacle avoidance) */
   allBuildings: Building[]
 ): Point[] {
   const start: Point = {
@@ -30,11 +34,4 @@ export function calculateAgentPath(
   // Simple implementation: direct path (no obstacle avoidance for now)
   // Full BFS implementation would go here
   return [start, end]
-}
-
-function pointInRect(point: Point, rect: { x: number; y: number; width: number; height: number }): boolean {
-  return point.x >= rect.x &&
-         point.x <= rect.x + rect.width &&
-         point.y >= rect.y &&
-         point.y <= rect.y + rect.height
 }
