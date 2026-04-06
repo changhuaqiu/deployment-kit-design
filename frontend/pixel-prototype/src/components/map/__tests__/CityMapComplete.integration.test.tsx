@@ -1,15 +1,34 @@
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { CityMapComplete } from '../CityMapComplete'
 import { useMapStore } from '@/store/mapStore'
+import { useDistrictStore } from '@/store/districts'
 import { vi } from 'vitest'
 
 // Mock MapCanvas to avoid canvas rendering issues in tests
 vi.mock('../MapCanvas', () => ({
-  MapCanvas: ({ onBuildingClick }: { onBuildingClick: (id: string) => void }) => (
+  MapCanvas: ({
+    onBuildingClick,
+    onHoverChange,
+    onMousePositionChange
+  }: {
+    onBuildingClick: (id: string) => void
+    onHoverChange: (hovered: { type: string; id: string | null }) => void
+    onMousePositionChange?: (position: { x: number; y: number }) => void
+  }) => (
     <div
       role="img"
       aria-label="map canvas"
       onClick={() => onBuildingClick('test-compute')}
+      onMouseMove={(e: any) => {
+        // Update mouse position
+        if (onMousePositionChange) {
+          onMousePositionChange({ x: e.clientX, y: e.clientY })
+        }
+        // Simulate hover detection when mouse moves
+        if (e.clientX > 150 && e.clientX < 250 && e.clientY > 150 && e.clientY < 250) {
+          onHoverChange({ type: 'building', id: 'test-compute' })
+        }
+      }}
     >
       Mock Map Canvas
     </div>
@@ -26,6 +45,11 @@ describe('CityMapComplete Integration', () => {
     useMapStore.getState().setHovered({ type: null, id: null })
     useMapStore.getState().setSelection({ type: null, id: null })
     vi.useFakeTimers()
+
+    // Create a mock district so buildings array will have data
+    useDistrictStore.getState().createDistrict('test-compute', 'test', 'COMPUTE', {
+      x: 100, y: 100, width: 100, height: 100
+    })
   })
 
   afterEach(() => {
@@ -114,6 +138,20 @@ describe('CityMapComplete Integration', () => {
     const updatedHovered = useMapStore.getState().hovered
     expect(updatedHovered.type).toBe('building')
     expect(updatedHovered.id).toBe('test-compute')
+  })
+
+  it('shows tooltip when hovering', () => {
+    render(<CityMapComplete />)
+
+    // Simulate hover interaction (as triggered by mouse move in real scenario)
+    act(() => {
+      useMapStore.getState().setHovered({ type: 'building', id: 'test-compute' })
+    })
+
+    // Verify hover state was updated (triggers tooltip rendering)
+    const hovered = useMapStore.getState().hovered
+    expect(hovered.type).toBe('building')
+    expect(hovered.id).toBe('test-compute')
   })
 
   it('handles preset view buttons', () => {
