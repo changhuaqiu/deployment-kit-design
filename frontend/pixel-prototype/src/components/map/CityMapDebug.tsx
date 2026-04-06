@@ -17,14 +17,11 @@ export function CityMapDebug() {
 
   // Initialize on mount
   useEffect(() => {
-    console.log('🏗️ CityMapDebug: Initializing...')
-
     try {
       // Create districts
       const districtTypes = [DistrictType.COMPUTE, DistrictType.DATA]
       districtTypes.forEach((type) => {
         const districtId = `test-${type}`
-        console.log(`Creating district: ${districtId}`)
         createDistrict(districtId, 'test', type)
       })
 
@@ -32,11 +29,8 @@ export function CityMapDebug() {
       const agentRoles = [AgentRole.SCANNER, AgentRole.PLANNER]
       agentRoles.forEach((role, index) => {
         const agentId = `agent-${index}`
-        console.log(`Creating agent: ${agentId}`)
         createAgent(agentId, role, `Agent ${index}`)
       })
-
-      console.log('✅ Initialization complete')
     } catch (error) {
       console.error('❌ Initialization error:', error)
     }
@@ -44,13 +38,6 @@ export function CityMapDebug() {
 
   const districtList = Object.values(districts)
   const agentList = Object.values(agents)
-
-  console.log('📊 Current state:', {
-    districts: districtList.length,
-    agents: agentList.length,
-    currentView,
-    selectedCity
-  })
 
   return (
     <div style={{

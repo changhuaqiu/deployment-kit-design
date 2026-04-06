@@ -70,12 +70,10 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   ]
 
   const handleBuildingClick = (buildingId: string) => {
-    console.log('Building clicked:', buildingId)
     setSelection({ type: 'building', id: buildingId })
   }
 
   const handleAgentClick = (agentId: string) => {
-    console.log('Agent clicked:', agentId)
     setSelection({ type: 'agent', id: agentId })
   }
 
@@ -146,7 +144,7 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
         overflowY: 'auto',
         color: '#fff'
       }}>
-        <AgentOfficePanel onOpenLedger={() => console.log('Open ledger')} />
+        <AgentOfficePanel onOpenLedger={() => {}} />
       </div>
     </div>
   )

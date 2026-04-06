@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import type { Building, Connection, ZoomLevel, SelectionState, ViewportState, HoverState } from '@/types/map'
 import { getZoomScale } from '@/types/map'
 import { mapToScreen, screenToMap, pointInRect } from '@/utils/mapCoordinates'
 import { drawBuilding, drawConnection } from '@/utils/mapRendering'
 import { calculateAgentPath } from '@/utils/agentPathfinding'
+import { cullBuildingsToViewport } from '@/utils/mapOptimization'
 import type { Agent } from '@/types/agents'
 import type { WorkerAgent } from '@/store/agents'
 import { AgentRenderer } from './AgentRenderer'
@@ -38,10 +39,10 @@ export function MapCanvas({
   onAgentClick,
   onViewportChange,
   onZoomChange,
-  onHoverChange
+  onHoverChange,
+  onMousePositionChange
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const dragStateRef = useRef<{
     isDragging: boolean
     startX: number
@@ -195,7 +196,8 @@ export function MapCanvas({
     })
 
     // Draw buildings
-    buildings.forEach((building) => {
+    const visibleBuildings = cullBuildingsToViewport(buildings, viewport, zoom, canvas.width, canvas.height)
+    visibleBuildings.forEach((building) => {
       const screenPos = mapToScreen(
         building.position.x,
         building.position.y,
@@ -205,16 +207,6 @@ export function MapCanvas({
 
       const width = building.position.width * zoomScale
       const height = building.position.height * zoomScale
-
-      // Check if visible
-      if (
-        screenPos.x + width < 0 ||
-        screenPos.x > canvas.width ||
-        screenPos.y + height < 0 ||
-        screenPos.y > canvas.height
-      ) {
-        return
-      }
 
       // Draw hover highlight
       if (hovered.type === 'building' && hovered.id === building.id) {
@@ -351,7 +343,10 @@ export function MapCanvas({
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
 
-      setMousePosition({ x: e.clientX, y: e.clientY })
+      // Update mouse position if callback provided
+      if (onMousePositionChange) {
+        onMousePositionChange({ x: e.clientX, y: e.clientY })
+      }
 
       if (!dragStateRef.current.isDragging) {
         // Perform hover detection when not dragging
