@@ -10,6 +10,22 @@ interface MapActions {
   zoomToBuilding: (buildingId: string) => void
 }
 
+// Add these constants after MapActions interface
+export const PRESET_VIEWPORTS = {
+  test: {
+    x: 50,
+    y: 100,
+  },
+  prod: {
+    x: 400,
+    y: 100,
+  },
+  all: {
+    x: 250,
+    y: 50,
+  }
+} as const
+
 type MapStore = MapState & MapActions
 
 const DEFAULT_VIEWPORT: ViewportState = {

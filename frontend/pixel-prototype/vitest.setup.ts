@@ -1,8 +1,15 @@
 import '@testing-library/jest-dom/vitest'
 import { vi } from 'vitest'
+import { renderHook } from '@testing-library/react'
+import React from 'react'
+import ReactDOM from 'react-dom'
 
 // Make vi available globally for tests
 global.vi = vi
+
+// Set up React for Zustand tests
+window.React = React
+window.ReactDOM = ReactDOM
 
 // Mock ImageData for canvas operations
 global.ImageData = class ImageData {
@@ -42,5 +49,6 @@ HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
   measureText: vi.fn(() => ({ width: 0 })),
   fillText: vi.fn(),
   strokeText: vi.fn(),
+  strokeRect: vi.fn(),
 })) as any
 
