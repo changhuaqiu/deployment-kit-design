@@ -469,12 +469,13 @@ export function MapCanvas({
 
       // Check if this was a click (not a drag)
       const DRAG_THRESHOLD = 5
-      if (dragStateRef.current.totalDistance < DRAG_THRESHOLD && !dragStateRef.current.isDraggingBuilding) {
+      if (dragStateRef.current.totalDistance < DRAG_THRESHOLD) {
         const mapPos = screenToMap(x, y, viewport, zoomScale)
 
         // Check building clicks
         for (const building of buildings) {
           if (pointInRect(mapPos, building.position)) {
+            console.log('🖱️ Building clicked:', building.name)
             onBuildingClick(building.id)
             dragStateRef.current.isDragging = false
             dragStateRef.current.isDraggingBuilding = false
