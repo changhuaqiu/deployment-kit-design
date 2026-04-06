@@ -343,8 +343,16 @@ export function MapCanvas({
       let clickedBuildingId: string | null = null
 
       for (const building of buildings) {
+        const buildingRight = building.position.x + building.position.width
+        const buildingBottom = building.position.y + building.position.height
+
+        console.log(`  Checking ${building.name}:`)
+        console.log(`     Building rect: (${building.position.x}, ${building.position.y}) to (${buildingRight}, ${buildingBottom})`)
+        console.log(`     Click point: (${mapPos.x}, ${mapPos.y})`)
+
         const inRect = pointInRect(mapPos, building.position)
-        console.log(`  Checking ${building.name} (${building.position.x},${building.position.y},${building.position.width}x${building.position.height}): ${inRect ? '✓' : '✗'}`)
+        console.log(`     Result: ${inRect ? '✓ INSIDE' : '✗ OUTSIDE'}`)
+
         if (inRect) {
           clickedBuildingId = building.id
           break
