@@ -324,8 +324,12 @@ export function MapCanvas({
   // Mouse down handler
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
+      console.log('🖱️ MOUSE DOWN event fired!')
       const canvas = canvasRef.current
-      if (!canvas) return
+      if (!canvas) {
+        console.log('❌ No canvas element')
+        return
+      }
 
       const rect = canvas.getBoundingClientRect()
       const x = e.clientX - rect.left
@@ -334,6 +338,7 @@ export function MapCanvas({
       // Check if clicking on a building
       const mapPos = screenToMap(x, y, viewport, zoomScale)
       console.log('🖱️ CLICK at screen:', x, y, '→ map:', mapPos.x, mapPos.y)
+      console.log('  Buildings count:', buildings.length)
 
       let clickedBuildingId: string | null = null
 
