@@ -82,10 +82,7 @@ export function CityMapComplete() {
       }}>
         <MapCanvas
           buildings={buildings}
-          agents={agentList.map(a => ({
-            id: a.id,
-            position: a.position || { x: 150, y: 150 }
-          }))}
+          agents={agentList}
           connections={connections}
           viewport={viewport}
           zoom={zoom}
@@ -105,7 +102,7 @@ export function CityMapComplete() {
         overflowY: 'auto',
         color: '#fff'
       }}>
-        <AgentOfficePanel />
+        <AgentOfficePanel onOpenLedger={() => console.log('Open ledger')} />
       </div>
     </div>
   )
