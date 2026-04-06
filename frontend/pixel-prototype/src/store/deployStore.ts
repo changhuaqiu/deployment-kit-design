@@ -427,7 +427,7 @@ export const useDeployStore = create<DeployState>((set, get) => ({
   changes: initialChanges,
   runs: initialRuns,
   agents: [
-    { id: 'ag_rev', role: 'reviewer', name: '安检员', icon: '👮', status: 'idle', currentTask: 'Zzz...' },
+    { id: 'ag_rev', role: 'reviewer', name: '安检员', icon: '👮', status: 'idle', currentTask: 'Zzz...', position: { mapX: 900, mapY: 300 } },  // Office position
   ],
   ledger: [],
   refineryQueue: 0,
@@ -479,7 +479,8 @@ export const useDeployStore = create<DeployState>((set, get) => ({
       name: sa.name,
       icon: taskType === 'scan' ? '🕵️' : '👨‍🎨',
       status: 'working',
-      currentTask: sa.task
+      currentTask: sa.task,
+      position: { mapX: 900, mapY: 300 }  // Start at office
     }))
 
     set((state) => ({

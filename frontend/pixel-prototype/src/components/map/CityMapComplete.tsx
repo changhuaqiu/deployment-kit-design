@@ -8,7 +8,9 @@ import { DistrictType, AgentRole } from '@/types/agents'
 import { useAgentStore } from '@/store/agents'
 import { useDistrictStore } from '@/store/districts'
 import { useMapStore } from '@/store/mapStore'
+import { useDeployStore } from '@/store/deployStore'
 import { districtsToBuildings } from '@/utils/mapRendering'
+import type { WorkerAgent } from '@/store/agents'
 
 /**
  * Clean City Map - No supervisors, just district areas
@@ -18,6 +20,7 @@ export function CityMapComplete() {
   const agents = useAgentStore((state) => state.agents)
   const createDistrict = useDistrictStore((state) => state.createDistrict)
   const createAgent = useAgentStore((state) => state.createAgent)
+  const workerAgents = useDeployStore((state) => state.agents)
 
   const viewport = useMapStore((state) => state.viewport)
   const zoom = useMapStore((state) => state.zoom)
@@ -93,6 +96,7 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
         <MapCanvas
           buildings={buildings}
           agents={agentList}
+          workerAgents={workerAgents}
           connections={connections}
           viewport={viewport}
           zoom={zoom}

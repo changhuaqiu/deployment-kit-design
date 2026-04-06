@@ -4,10 +4,13 @@ import { getZoomScale } from '@/types/map'
 import { mapToScreen, screenToMap, pointInRect } from '@/utils/mapCoordinates'
 import { drawBuilding, drawConnection } from '@/utils/mapRendering'
 import type { Agent } from '@/types/agents'
+import type { WorkerAgent } from '@/store/agents'
+import { AgentRenderer } from './AgentRenderer'
 
 interface MapCanvasProps {
   buildings: Building[]
   agents: Agent[]
+  workerAgents: WorkerAgent[]
   connections: Connection[]
   viewport: ViewportState
   zoom: ZoomLevel
@@ -18,11 +21,13 @@ interface MapCanvasProps {
   onViewportChange: (updates: Partial<ViewportState>) => void
   onZoomChange: (zoom: ZoomLevel) => void
   onHoverChange: (hovered: HoverState) => void
+  onMousePositionChange?: (position: { x: number; y: number }) => void
 }
 
 export function MapCanvas({
   buildings,
   agents,
+  workerAgents,
   connections,
   viewport,
   zoom,
@@ -412,19 +417,32 @@ export function MapCanvas({
   }, [])
 
   return (
-    <canvas
-      ref={canvasRef}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
-      onWheel={handleWheel}
-      style={{
-        display: 'block',
-        width: '100%',
-        height: '100%',
-        cursor: hovered.type ? 'pointer' : 'default'
-      }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <canvas
+        ref={canvasRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        onWheel={handleWheel}
+        style={{
+          display: 'block',
+          width: '100%',
+          height: '100%',
+          cursor: hovered.type ? 'pointer' : 'default'
+        }}
+      />
+
+      {/* Render agents as DOM overlays */}
+      {workerAgents.map(agent => (
+        <AgentRenderer
+          key={agent.id}
+          agent={agent}
+          viewport={viewport}
+          zoom={zoom}
+          onClick={onAgentClick}
+        />
+      ))}
+    </div>
   )
 }
