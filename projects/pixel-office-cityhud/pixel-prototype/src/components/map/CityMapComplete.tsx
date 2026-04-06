@@ -125,7 +125,7 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
           type={hovered.type}
           target={hovered.type === 'building'
             ? buildings.find(b => b.id === hovered.id)
-            : agents.find(a => a.id === hovered.id)
+            : agentList.find(a => a.id === hovered.id)
           }
           position={mousePosition}
         />
