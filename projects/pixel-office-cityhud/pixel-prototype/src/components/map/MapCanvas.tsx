@@ -333,12 +333,15 @@ export function MapCanvas({
 
       // Check if clicking on a building
       const mapPos = screenToMap(x, y, viewport, zoomScale)
+      console.log('🖱️ CLICK at screen:', x, y, '→ map:', mapPos.x, mapPos.y)
+
       let clickedBuildingId: string | null = null
 
       for (const building of buildings) {
-        if (pointInRect(mapPos, building.position)) {
+        const inRect = pointInRect(mapPos, building.position)
+        console.log(`  Checking ${building.name} (${building.position.x},${building.position.y},${building.position.width}x${building.position.height}): ${inRect ? '✓' : '✗'}`)
+        if (inRect) {
           clickedBuildingId = building.id
-          console.log('🏢 Clicked building:', building.name, building.id)
           break
         }
       }
@@ -347,7 +350,7 @@ export function MapCanvas({
         // Start dragging building
         const building = buildings.find(b => b.id === clickedBuildingId)
         if (building) {
-          console.log('✋ Starting to drag building:', building.name)
+          console.log('✅ Starting building drag:', building.name)
           dragStateRef.current = {
             isDragging: true,
             isDraggingBuilding: true,
@@ -364,6 +367,7 @@ export function MapCanvas({
         }
       }
 
+      console.log('❌ No building clicked, starting viewport drag')
       // Otherwise, start dragging viewport
       dragStateRef.current = {
         isDragging: true,
@@ -491,8 +495,6 @@ export function MapCanvas({
   // Wheel handler for zooming
   const handleWheel = useCallback(
     (e: React.WheelEvent<HTMLCanvasElement>) => {
-      e.preventDefault()
-
       const zoomLevels: ZoomLevel[] = ['world', 'environment', 'building']
       const currentIndex = zoomLevels.indexOf(zoom)
 
@@ -519,13 +521,17 @@ export function MapCanvas({
 
       canvas.width = width
       canvas.height = height
+
+      console.log('📐 Canvas size:', width, 'x', height)
+      console.log('📍 Viewport:', viewport, 'Zoom:', zoom)
+      console.log('🏢 Buildings:', buildings)
     }
 
     updateSize()
 
     window.addEventListener('resize', updateSize)
     return () => window.removeEventListener('resize', updateSize)
-  }, [])
+  }, [viewport, zoom, buildings])
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

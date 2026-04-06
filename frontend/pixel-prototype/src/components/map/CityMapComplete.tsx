@@ -48,6 +48,7 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
       { id: 'network-gateway', name: 'Network Gateway', status: 'healthy' as const, position: { x: 500, y: 200, width: 130, height: 90 } }
     ]
     setBuildings(demoBuildings)
+    console.log('🏗️ Initialized buildings:', demoBuildings)
 
     // Create agents in office
     createAgent('scanner-1', AgentRole.SCANNER, '🕵️', '普查员 #1')
