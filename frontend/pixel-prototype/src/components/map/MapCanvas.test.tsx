@@ -44,14 +44,17 @@ describe('MapCanvas', () => {
       <MapCanvas
         buildings={[]}
         agents={[]}
+        workerAgents={[]}
         connections={[]}
         viewport={{ x: 0, y: 0, width: 800, height: 600 }}
         zoom="environment"
         selection={{ type: null, id: null }}
+        hovered={{ type: null, id: null }}
         onBuildingClick={vi.fn()}
         onAgentClick={vi.fn()}
         onViewportChange={vi.fn()}
         onZoomChange={vi.fn()}
+        onHoverChange={vi.fn()}
       />
     )
 
@@ -77,14 +80,17 @@ describe('MapCanvas', () => {
       <MapCanvas
         buildings={buildings}
         agents={[]}
+        workerAgents={[]}
         connections={[]}
         viewport={{ x: 0, y: 0, width: 800, height: 600 }}
         zoom="environment"
         selection={{ type: null, id: null }}
+        hovered={{ type: null, id: null }}
         onBuildingClick={handleClick}
         onAgentClick={vi.fn()}
         onViewportChange={vi.fn()}
         onZoomChange={vi.fn()}
+        onHoverChange={vi.fn()}
       />
     )
 
