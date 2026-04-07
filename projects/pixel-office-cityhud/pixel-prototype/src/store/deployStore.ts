@@ -924,12 +924,9 @@ export const useDeployStore = create<DeployState>((set, get) => ({
         }
       }
 
-      if (!('workflowId' in event)) {
-            return {}
-          }
-          if (!s.activeWorkflow || s.activeWorkflow.workflowId !== event.workflowId) {
-            return {}
-          }
+      if (!s.activeWorkflow || s.activeWorkflow.workflowId !== event.workflowId) {
+        return {}
+      }
 
       if (event.kind === 'skill_started') {
         return {
