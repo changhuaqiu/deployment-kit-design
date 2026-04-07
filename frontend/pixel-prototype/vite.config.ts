@@ -10,6 +10,10 @@ const realProjectRoot = realpathSync(projectRoot)
 
 // https://vite.dev/config/
 export default defineConfig({
+  root: realProjectRoot,
+  resolve: {
+    preserveSymlinks: true,
+  },
   build: {
     sourcemap: 'hidden',
   },

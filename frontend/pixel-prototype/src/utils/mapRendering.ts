@@ -74,21 +74,21 @@ export function drawBuilding(
 
   // Draw icon (bigger, more prominent)
   const icon = getBuildingIcon(building.type)
-  const iconSize = Math.max(32, width / 2) // Much bigger icon
-  ctx.font = `${iconSize}px "Press Start 2P", "Courier New", monospace` // Pixel font
+  const iconSize = Math.max(24, width / 3.5) // Scaled down icon to fit better
+  ctx.font = `${iconSize}px "Segoe UI", "Apple Color Emoji", "Segoe UI Emoji", sans-serif` // System emoji font for clearer rendering
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(icon, x + width / 2, y + height / 2 - 5) // Slightly above center
+  ctx.fillText(icon, x + width / 2, y + height / 2 - 10) // Centered with offset for text
 
   // Draw name (smaller text below icon)
-  const textSize = Math.max(8, width / 10) // Smaller text
-  ctx.font = `${textSize}px "Press Start 2P", "Courier New", monospace`
-  ctx.fillStyle = '#94a3b8' // Lighter gray for less prominence
+  const textSize = Math.max(10, width / 12) // Slightly larger, readable text
+  ctx.font = `bold ${textSize}px "Courier New", monospace`
+  ctx.fillStyle = '#e2e8f0' // Brighter white/gray for better contrast
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
   // Truncate name if too long
-  const displayName = building.name.length > 12 ? building.name.substring(0, 10) + '..' : building.name
-  ctx.fillText(displayName, x + width / 2, y + height - 6)
+  const displayName = building.name.length > 15 ? building.name.substring(0, 13) + '..' : building.name
+  ctx.fillText(displayName, x + width / 2, y + height - 12)
 
   // Draw animation overlay
   drawBuildingWithAnimation(ctx, building, x, y, width, height, time)

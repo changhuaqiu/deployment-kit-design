@@ -42,10 +42,10 @@ const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   useEffect(() => {
     // Create demo buildings (not business districts)
     const demoBuildings = [
-      { id: 'office', name: 'Agent Office', status: 'healthy' as const, position: { x: 850, y: 250, width: 120, height: 100 } },
-      { id: 'data-center', name: 'Data Center', status: 'healthy' as const, position: { x: 100, y: 100, width: 150, height: 120 } },
-      { id: 'compute-node', name: 'Compute Node', status: 'warning' as const, position: { x: 300, y: 150, width: 100, height: 100 } },
-      { id: 'network-gateway', name: 'Network Gateway', status: 'healthy' as const, position: { x: 500, y: 200, width: 130, height: 90 } }
+      { id: 'office', name: 'Agent Office', status: 'healthy' as const, position: { x: 650, y: 150, width: 180, height: 160 } },
+      { id: 'data-center', name: 'Data Center', status: 'healthy' as const, position: { x: 100, y: 100, width: 220, height: 180 } },
+      { id: 'compute-node', name: 'Compute Node', status: 'warning' as const, position: { x: 300, y: 350, width: 160, height: 140 } },
+      { id: 'network-gateway', name: 'Network Gateway', status: 'healthy' as const, position: { x: 600, y: 450, width: 200, height: 150 } }
     ]
     setBuildings(demoBuildings)
     console.log('🏗️ Initialized buildings:', demoBuildings)
