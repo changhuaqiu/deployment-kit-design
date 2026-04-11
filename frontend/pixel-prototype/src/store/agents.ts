@@ -9,6 +9,8 @@ import {
   District,
   DistrictType
 } from '@/types/agents';
+import { generatePersonality } from '@/types/agents';
+import { AgentVisualState } from '@/types/agents';
 
 // NEW: WorkerAgent interface for map coordinate system
 export interface WorkerAgent {
@@ -105,6 +107,8 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
 
   // Agent creation and management
   createAgent: (id: string, role: AgentRole, icon: string, name: string) => {
+    const personality = generatePersonality(role);
+
     const newAgent: Agent = {
       id,
       name,
@@ -119,7 +123,12 @@ const createAgentStore = () => create<AgentStore>((set, get) => ({
       bubble: null,
       palette: Math.floor(Math.random() * 5), // 0-4 for visual variety
       frame: 0,
-      frameTimer: 0
+      frameTimer: 0,
+      personality,
+      visualState: AgentVisualState.IDLE,
+      workSpeedMultiplier: 1.0,
+      lastBreakTime: Date.now(),
+      stateHistory: []
     };
 
     set((state) => ({

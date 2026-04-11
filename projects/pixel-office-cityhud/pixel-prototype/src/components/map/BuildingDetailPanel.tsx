@@ -1,7 +1,8 @@
 import { useMapStore } from '@/store/mapStore'
-import { useDeployStore, mockOpenCodeApi } from '@/store/deployStore'
+import { useDeployStore, mockOpenCodeApi, DEMO_USER } from '@/store/deployStore'
 import type { Building } from '@/types/map'
 import { useNavigate } from 'react-router-dom'
+import { CheckCircle2, XCircle, Play } from 'lucide-react'
 
 interface BuildingDetailPanelProps {
   buildingId: string | null
@@ -15,6 +16,10 @@ export function BuildingDetailPanel({ buildingId, onClose }: BuildingDetailPanel
   const runWorkshopScan = useDeployStore((s) => s.runWorkshopScan)
   const runWorkshopGenerate = useDeployStore((s) => s.runWorkshopGenerate)
   const activeWorkflow = useDeployStore((s) => s.activeWorkflow)
+  const approveChange = useDeployStore((s) => s.approveChange)
+  const rejectChange = useDeployStore((s) => s.rejectChange)
+  const startRun = useDeployStore((s) => s.startRun)
+  const user = DEMO_USER
   
   const navigate = useNavigate()
 
@@ -223,77 +228,179 @@ export function BuildingDetailPanel({ buildingId, onClose }: BuildingDetailPanel
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: '8px', flexDirection: 'column', marginTop: '32px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          
+          {/* Pre-Approval Phase: Scan & Generate */}
+          {(!linkedChange || linkedChange.status === 'draft' || linkedChange.status === 'in_workshop') && (
+            <>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  style={{
+                    flex: 1, padding: '10px 12px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa',
+                    border: '1px solid rgba(59, 130, 246, 0.5)', borderRadius: '6px',
+                    cursor: 'pointer', fontWeight: 'bold', fontSize: '11px',
+                    transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.4)'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}
+                  onClick={() => {
+                    if (linkedChange) {
+                      mockOpenCodeApi.fetchAgentsForTask('scan').then((subAgents) => {
+                        dispatchAgents('scan', subAgents, () => {
+                          runWorkshopScan(linkedChange.id)
+                        })
+                      })
+                    }
+                  }}
+                >
+                  <span>🔭</span> DISPATCH SCANNER
+                </button>
+
+                <button 
+                  style={{
+                    flex: 1, padding: '10px 12px',
+                    backgroundColor: 'rgba(167, 139, 250, 0.2)', color: '#c084fc',
+                    border: '1px solid rgba(167, 139, 250, 0.5)', borderRadius: '6px',
+                    cursor: 'pointer', fontWeight: 'bold', fontSize: '11px',
+                    transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(167, 139, 250, 0.4)'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = 'rgba(167, 139, 250, 0.2)'}
+                  onClick={() => {
+                    if (linkedChange) {
+                      mockOpenCodeApi.fetchAgentsForTask('generate').then((subAgents) => {
+                        dispatchAgents('generate', subAgents, () => {
+                          runWorkshopGenerate(linkedChange.id)
+                        })
+                      })
+                    }
+                  }}
+                >
+                  <span>📝</span> GENERATE PLAN
+                </button>
+              </div>
+              <button 
+                style={{
+                  width: '100%', padding: '12px 16px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399',
+                  border: '1px solid rgba(16, 185, 129, 0.5)', borderRadius: '6px',
+                  cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', letterSpacing: '0.05em',
+                  transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                  boxShadow: '0 0 15px rgba(16, 185, 129, 0.1)'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.4)'
+                  e.currentTarget.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.3)'
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.2)'
+                  e.currentTarget.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.1)'
+                }}
+                onClick={() => {
+                  // Simply change status instead of navigating
+                  if (linkedChange) {
+                    // Update change status to 'in_review' directly in store
+                    useDeployStore.setState(s => ({
+                      changes: s.changes.map(c => 
+                        c.id === linkedChange.id ? { ...c, status: 'in_review' } : c
+                      )
+                    }))
+                  }
+                }}
+              >
+                <span>🚀</span> SUBMIT FOR APPROVAL
+              </button>
+            </>
+          )}
+
+          {/* Review Phase: Approve / Reject */}
+          {linkedChange?.status === 'in_review' && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                style={{
+                  flex: 1, padding: '12px 16px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399',
+                  border: '1px solid rgba(16, 185, 129, 0.5)', borderRadius: '6px',
+                  cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', letterSpacing: '0.05em',
+                  transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
+                  boxShadow: '0 0 15px rgba(16, 185, 129, 0.1)'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.4)'
+                  e.currentTarget.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.3)'
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.2)'
+                  e.currentTarget.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.1)'
+                }}
+                onClick={() => approveChange(linkedChange.id)}
+              >
+                <CheckCircle2 size={16} /> APPROVE
+              </button>
+              
+              <button 
+                style={{
+                  flex: 1, padding: '12px 16px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171',
+                  border: '1px solid rgba(239, 68, 68, 0.5)', borderRadius: '6px',
+                  cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', letterSpacing: '0.05em',
+                  transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
+                  boxShadow: '0 0 15px rgba(239, 68, 68, 0.1)'
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.4)'
+                  e.currentTarget.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.3)'
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)'
+                  e.currentTarget.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.1)'
+                }}
+                onClick={() => rejectChange(linkedChange.id)}
+              >
+                <XCircle size={16} /> REJECT
+              </button>
+            </div>
+          )}
+
+          {/* Approved Phase: Execution */}
+          {linkedChange?.status === 'approved' && (
             <button 
               style={{
-                flex: 1, padding: '10px 12px',
-                backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa',
-                border: '1px solid rgba(59, 130, 246, 0.5)', borderRadius: '6px',
-                cursor: 'pointer', fontWeight: 'bold', fontSize: '11px',
-                transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px'
+                width: '100%', padding: '14px 16px',
+                backgroundColor: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.6)', borderRadius: '6px',
+                cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', letterSpacing: '0.05em',
+                transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                boxShadow: '0 0 20px rgba(56, 189, 248, 0.2)'
               }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.4)'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}
+              onMouseOver={e => {
+                e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.4)'
+                e.currentTarget.style.boxShadow = '0 0 30px rgba(56, 189, 248, 0.4)'
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.2)'
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(56, 189, 248, 0.2)'
+              }}
               onClick={() => {
-                if (linkedChange) {
-                  mockOpenCodeApi.fetchAgentsForTask('scan').then((subAgents) => {
-                    dispatchAgents('scan', subAgents, () => {
-                      runWorkshopScan(linkedChange.id)
-                    })
-                  })
-                }
+                startRun({ changeId: linkedChange.id, createdBy: user.email })
               }}
             >
-              <span>🔭</span> DISPATCH SCANNER
+              <Play size={18} fill="currentColor" /> COMMENCE BUILD
             </button>
+          )}
 
-            <button 
-              style={{
-                flex: 1, padding: '10px 12px',
-                backgroundColor: 'rgba(167, 139, 250, 0.2)', color: '#c084fc',
-                border: '1px solid rgba(167, 139, 250, 0.5)', borderRadius: '6px',
-                cursor: 'pointer', fontWeight: 'bold', fontSize: '11px',
-                transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px'
-              }}
-              onMouseOver={e => e.currentTarget.style.backgroundColor = 'rgba(167, 139, 250, 0.4)'}
-              onMouseOut={e => e.currentTarget.style.backgroundColor = 'rgba(167, 139, 250, 0.2)'}
-              onClick={() => {
-                if (linkedChange) {
-                  mockOpenCodeApi.fetchAgentsForTask('generate').then((subAgents) => {
-                    dispatchAgents('generate', subAgents, () => {
-                      runWorkshopGenerate(linkedChange.id)
-                    })
-                  })
-                }
-              }}
-            >
-              <span>📝</span> GENERATE PLAN
-            </button>
-          </div>
-
-          <button 
-            style={{
+          {/* Running / Completed Phase */}
+          {(linkedChange?.status === 'running' || linkedChange?.status === 'succeeded' || linkedChange?.status === 'failed') && (
+            <div style={{
               width: '100%', padding: '12px 16px',
-              backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399',
-              border: '1px solid rgba(16, 185, 129, 0.5)', borderRadius: '6px',
-              cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', letterSpacing: '0.05em',
-              transition: 'all 0.2s', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-              boxShadow: '0 0 15px rgba(16, 185, 129, 0.1)'
-            }}
-            onMouseOver={e => {
-              e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.4)'
-              e.currentTarget.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.3)'
-            }}
-            onMouseOut={e => {
-              e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.2)'
-              e.currentTarget.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.1)'
-            }}
-            onClick={() => {
-              if (linkedChange) navigate(`/changes/${linkedChange.id}`)
-            }}
-          >
-            <span>🚀</span> SUBMIT FOR APPROVAL
-          </button>
+              backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#94a3b8',
+              border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px',
+              textAlign: 'center', fontWeight: 'bold', fontSize: '12px', letterSpacing: '0.05em'
+            }}>
+              {linkedChange.status === 'running' ? '⚡ BUILD IN PROGRESS' : 
+               linkedChange.status === 'succeeded' ? '✅ MISSION ACCOMPLISHED' : '❌ MISSION FAILED'}
+            </div>
+          )}
         </div>
       </div>
     </aside>
